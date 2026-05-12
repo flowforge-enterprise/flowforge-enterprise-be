@@ -26,13 +26,16 @@ All seed accounts use password `password123`.
 ## Run Locally
 
 ```bash
-mvn spring-boot:run
+mvn package -DskipTests
+java -jar target/workflow-mvp-backend-0.0.1-SNAPSHOT.jar
 ```
 
 The app starts on `http://localhost:8080`.
 
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - H2 console: `http://localhost:8080/h2-console`
+
+On Windows, `mvn spring-boot:run` can fail when the project path contains non-ASCII characters because the Spring Boot Maven plugin uses a classpath argfile. Running the packaged jar avoids that issue.
 
 ## Run With Docker Compose
 
