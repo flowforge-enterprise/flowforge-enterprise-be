@@ -1,0 +1,45 @@
+# Maven / Java build output
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+logs/
+
+# Runtime / local data
+*.pid
+*.seed
+*.h2.db
+*.mv.db
+*.trace.db
+
+# Environment files and secrets
+.env
+.env.*
+application-local.yml
+application-local.yaml
+application-*.local.yml
+application-*.local.yaml
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker Compose local overrides
+docker-compose.override.yml
+
+# Test reports generated outside Maven target
+surefire-reports/
+failsafe-reports/

@@ -1,0 +1,43 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: workflow-mvp-backend
+  datasource:
+    url: jdbc:h2:mem:workflow_mvp;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    # Override this via APP_JWT_SECRET in deployed environments.
+    secret: ${APP_JWT_SECRET:workflow-mvp-demo-secret-key-change-before-production-123456}
+    expiration-seconds: 86400
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/workflow_mvp?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:workflow}
+    password: ${MYSQL_PASSWORD:workflow}
+    driver-class-name: com.mysql.cj.jdbc.Driver
