@@ -43,6 +43,18 @@ On Windows, `mvn spring-boot:run` can fail when the project path contains non-AS
 docker compose up --build
 ```
 
+## Test And Coverage
+
+```bash
+mvn test
+```
+
+JaCoCo coverage report:
+
+```text
+target/site/jacoco/index.html
+```
+
 ## API Summary
 
 - `POST /api/auth/login`

@@ -20,6 +20,7 @@
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <dependencies>
@@ -96,6 +97,29 @@
                 <configuration>
                     <mainClass>com.cellead.workflow.WorkflowApplication</mainClass>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <destFile>${java.io.tmpdir}/workflow-mvp-backend-jacoco.exec</destFile>
+                    <dataFile>${java.io.tmpdir}/workflow-mvp-backend-jacoco.exec</dataFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
