@@ -84,6 +84,7 @@ Subscribe to: `/topic/notifications/{recipientId}`
 }
 ```
 
+
 Use the returned token as:
 
 ```text
