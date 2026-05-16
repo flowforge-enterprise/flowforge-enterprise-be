@@ -29,6 +29,11 @@ pipeline {
                 echo "===== Stop old services ====="
                 docker compose -p flowforge down || true
 
+                echo "===== Remove old standalone containers if exists ====="
+                docker rm -f flowforge-enterprise-be || true
+                docker rm -f flowforge-mysql || true
+                docker rm -f flowforge-enterprise-be-pipeline-mysql-1 || true
+
                 echo "===== Build and start services ====="
                 docker compose -p flowforge up -d --build
                 '''
