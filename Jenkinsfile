@@ -1,3 +1,4 @@
+name: flowforge
 pipeline {
     agent any
 
@@ -27,10 +28,10 @@ pipeline {
             steps {
                 sh '''
                 echo "===== Stop old services ====="
-                docker compose down || true
+                docker compose -p flowforge down || true
 
                 echo "===== Build and start services ====="
-                docker compose up -d --build
+                docker compose -p flowforge up -d --build
                 '''
             }
         }
