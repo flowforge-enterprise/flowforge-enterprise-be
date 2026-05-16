@@ -1,4 +1,3 @@
-name: flowforge
 pipeline {
     agent any
 
