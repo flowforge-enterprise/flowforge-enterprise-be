@@ -2,10 +2,11 @@ pipeline {
     agent any
 
     environment {
-        COMPOSE_PROJECT_NAME = 'flowforge'
-        BACKEND_CONTAINER = 'flowforge-enterprise-be'
-        MYSQL_CONTAINER = 'flowforge-mysql'
-        HOST_PORT = '8081'
+        KUBECONFIG = '/var/jenkins_home/.kube/config'
+
+        K8S_NAMESPACE = 'flowforge'
+        BACKEND_DEPLOYMENT = 'flowforge-backend'
+        BACKEND_CONTAINER = 'backend'
 
         ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
         ACR_NAMESPACE = 'nus_flowforge'
@@ -23,12 +24,17 @@ pipeline {
             }
         }
 
-        stage('Check Docker') {
+        stage('Check Tools') {
             steps {
                 sh '''
                 echo "===== Check docker ====="
                 docker version
-                docker compose version
+
+                echo "===== Check kubectl ====="
+                kubectl version --client
+
+                echo "===== Check ACK nodes ====="
+                kubectl get nodes
                 '''
             }
         }
@@ -72,47 +78,45 @@ pipeline {
             }
         }
 
-        stage('Deploy from ACR') {
+        stage('Deploy to ACK') {
             steps {
                 sh '''
-                echo "===== Stop old compose services ====="
-                docker compose -p $COMPOSE_PROJECT_NAME down || true
+                echo "===== Apply namespace ====="
+                kubectl apply -f k8s/namespace.yaml
 
-                echo "===== Remove old containers that may occupy ports ====="
-                docker rm -f flowforge-enterprise-be || true
-                docker rm -f flowforge-backend-1 || true
-                docker rm -f flowforge-enterprise-be-pipeline-backend-1 || true
+                echo "===== Apply MySQL resources ====="
+                kubectl apply -f k8s/mysql.yaml
 
-                docker rm -f flowforge-mysql || true
-                docker rm -f flowforge-mysql-1 || true
-                docker rm -f flowforge-enterprise-be-pipeline-mysql-1 || true
+                echo "===== Apply backend resources ====="
+                kubectl apply -f k8s/backend.yaml
 
-                echo "===== Pull latest image from ACR ====="
-                docker compose -p $COMPOSE_PROJECT_NAME pull backend
+                echo "===== Update backend image to current build ====="
+                kubectl set image deployment/$BACKEND_DEPLOYMENT \
+                  $BACKEND_CONTAINER=$IMAGE_NAME \
+                  -n $K8S_NAMESPACE
 
-                echo "===== Start services ====="
-                docker compose -p $COMPOSE_PROJECT_NAME up -d
+                echo "===== Wait for backend rollout ====="
+                kubectl rollout status deployment/$BACKEND_DEPLOYMENT \
+                  -n $K8S_NAMESPACE \
+                  --timeout=180s
                 '''
             }
         }
 
-        stage('Verify Containers') {
+        stage('Verify ACK Resources') {
             steps {
                 sh '''
-                echo "===== Show running containers ====="
-                docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
+                echo "===== Pods ====="
+                kubectl get pods -n $K8S_NAMESPACE
 
-                echo "===== Show backend logs ====="
-                docker logs --tail=80 $BACKEND_CONTAINER || true
-                '''
-            }
-        }
+                echo "===== Services ====="
+                kubectl get svc -n $K8S_NAMESPACE
 
-        stage('Verify Service') {
-            steps {
-                sh '''
-                echo "===== Verify backend service ====="
-                curl -i http://127.0.0.1:$HOST_PORT || true
+                echo "===== PVC ====="
+                kubectl get pvc -n $K8S_NAMESPACE || true
+
+                echo "===== Backend logs ====="
+                kubectl logs -n $K8S_NAMESPACE deployment/$BACKEND_DEPLOYMENT --tail=100 || true
                 '''
             }
         }
