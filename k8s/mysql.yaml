@@ -17,11 +17,12 @@ metadata:
   name: flowforge-mysql-pvc
   namespace: flowforge
 spec:
+  storageClassName: alicloud-disk-essd
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 20Gi
 
 ---
 apiVersion: apps/v1
