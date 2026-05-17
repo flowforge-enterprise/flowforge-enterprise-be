@@ -40,6 +40,8 @@ spec:
       labels:
         app: flowforge-mysql
     spec:
+      imagePullSecrets:
+        - name: acr-secret
       containers:
         - name: mysql
           image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/mysql:8.4
