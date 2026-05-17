@@ -2,8 +2,18 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'flowforge-enterprise-be'
+        COMPOSE_PROJECT_NAME = 'flowforge'
+        BACKEND_CONTAINER = 'flowforge-enterprise-be'
+        MYSQL_CONTAINER = 'flowforge-mysql'
         HOST_PORT = '8081'
+
+        ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
+        ACR_NAMESPACE = 'nus_flowforge'
+        IMAGE_REPO = 'flowforge-enterprise-be'
+
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_NAME = "${ACR_REGISTRY}/${ACR_NAMESPACE}/${IMAGE_REPO}:${IMAGE_TAG}"
+        IMAGE_LATEST = "${ACR_REGISTRY}/${ACR_NAMESPACE}/${IMAGE_REPO}:latest"
     }
 
     stages {
@@ -23,19 +33,65 @@ pipeline {
             }
         }
 
-        stage('Build and Start Services') {
+        stage('Build Image') {
             steps {
                 sh '''
-                echo "===== Stop old services ====="
-                docker compose -p flowforge down || true
+                echo "===== Build Docker image ====="
+                docker build -t $IMAGE_NAME .
 
-                echo "===== Remove old standalone containers if exists ====="
+                echo "===== Tag image as latest ====="
+                docker tag $IMAGE_NAME $IMAGE_LATEST
+                '''
+            }
+        }
+
+        stage('Login to ACR') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'acr-credential',
+                    usernameVariable: 'ACR_USERNAME',
+                    passwordVariable: 'ACR_PASSWORD'
+                )]) {
+                    sh '''
+                    echo "===== Login to ACR ====="
+                    echo "$ACR_PASSWORD" | docker login $ACR_REGISTRY -u "$ACR_USERNAME" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Image to ACR') {
+            steps {
+                sh '''
+                echo "===== Push version image ====="
+                docker push $IMAGE_NAME
+
+                echo "===== Push latest image ====="
+                docker push $IMAGE_LATEST
+                '''
+            }
+        }
+
+        stage('Deploy from ACR') {
+            steps {
+                sh '''
+                echo "===== Stop old compose services ====="
+                docker compose -p $COMPOSE_PROJECT_NAME down || true
+
+                echo "===== Remove old containers that may occupy ports ====="
                 docker rm -f flowforge-enterprise-be || true
+                docker rm -f flowforge-backend-1 || true
+                docker rm -f flowforge-enterprise-be-pipeline-backend-1 || true
+
                 docker rm -f flowforge-mysql || true
+                docker rm -f flowforge-mysql-1 || true
                 docker rm -f flowforge-enterprise-be-pipeline-mysql-1 || true
 
-                echo "===== Build and start services ====="
-                docker compose -p flowforge up -d --build
+                echo "===== Pull latest image from ACR ====="
+                docker compose -p $COMPOSE_PROJECT_NAME pull backend
+
+                echo "===== Start services ====="
+                docker compose -p $COMPOSE_PROJECT_NAME up -d
                 '''
             }
         }
@@ -44,10 +100,10 @@ pipeline {
             steps {
                 sh '''
                 echo "===== Show running containers ====="
-                docker ps
+                docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
 
                 echo "===== Show backend logs ====="
-                docker logs --tail=80 flowforge-enterprise-be || true
+                docker logs --tail=80 $BACKEND_CONTAINER || true
                 '''
             }
         }

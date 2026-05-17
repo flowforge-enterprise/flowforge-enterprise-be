@@ -1,4 +1,5 @@
 name: flowforge
+
 services:
   mysql:
     image: mysql:8.4
@@ -8,13 +9,12 @@ services:
       MYSQL_USER: workflow
       MYSQL_PASSWORD: workflow
       MYSQL_ROOT_PASSWORD: root
-#    ports:
-#      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    restart: always
 
   backend:
-    build: .
+    image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be:latest
     container_name: flowforge-enterprise-be
     depends_on:
       - mysql
@@ -26,5 +26,7 @@ services:
       APP_JWT_SECRET: workflow-mvp-demo-secret-key-change-before-production-123456
     ports:
       - "8081:8080"
+    restart: always
+
 volumes:
   mysql_data:
