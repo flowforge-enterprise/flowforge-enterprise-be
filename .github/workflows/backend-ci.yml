@@ -1,22 +1,136 @@
-name: Backend CI
+name: CI Security Checks
 
 on:
   push:
+    branches: [ main, master ]
   pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+  actions: read
 
 jobs:
-  build-test:
+  lint:
+    name: Lint Check
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
-          cache: maven
+          java-version: '17'
 
-      - name: Build and test
-        run: mvn -B test
+      - name: Run Maven Checkstyle
+        run: mvn checkstyle:check
+
+  sca:
+    name: SCA - Dependency and Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+  sast:
+    name: SAST - CodeQL
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java-kotlin' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+
+  dast:
+    name: DAST - OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    needs: [ lint, sca, sast ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build application
+        run: mvn clean package -DskipTests
+
+      - name: Set app port
+        run: echo "APP_PORT=8081" >> $GITHUB_ENV
+
+      - name: Start application and wait for readiness
+        run: |
+          nohup java -jar target/*.jar > app.log 2>&1 &
+          pid=$!
+          echo "APP_PID=$pid" >> $GITHUB_ENV
+
+          # wait up to 120s for the app to respond on the port
+          timeout=120
+          until curl -sSf http://localhost:${APP_PORT}/actuator/health >/dev/null 2>&1 || curl -sSf http://localhost:${APP_PORT}/ >/dev/null 2>&1 || [ $timeout -le 0 ]; do
+            sleep 2
+            timeout=$((timeout-2))
+          done
+
+          if [ $timeout -le 0 ]; then
+            echo "App did not become ready in time"
+            tail -n 200 app.log || true
+            kill $pid || true
+            exit 1
+          fi
+
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "http://localhost:${{ env.APP_PORT }}"
+          fail_action: true
+          allow_issue_writing: false
+
+      - name: Stop application
+        if: always()
+        run: |
+          if [ -n "${{ env.APP_PID }}" ]; then
+            kill ${{ env.APP_PID }} || true
+          else
+            pkill -f "java -jar target/" || true
+          fi
