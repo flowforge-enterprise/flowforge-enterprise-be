@@ -49,7 +49,6 @@ docker compose up --build
 mvn test
 ```
 
-
 JaCoCo coverage report:
 
 ```text
