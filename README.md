@@ -90,3 +90,4 @@ Use the returned token as:
 ```text
 Authorization: Bearer <token>
 ```
+
