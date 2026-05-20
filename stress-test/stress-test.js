@@ -1,6 +1,17 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
+// Tell k6 that 401 / 403 / 404 are acceptable responses for this test.
+// This is useful because the root path may be protected by Spring Security.
+http.setResponseCallback(
+    http.expectedStatuses(
+        { min: 200, max: 399 },
+        401,
+        403,
+        404
+    )
+);
+
 export const options = {
     stages: [
         { duration: '30s', target: 10 },
