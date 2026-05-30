@@ -107,7 +107,8 @@ class ServiceBranchTest {
 
         assertThat(workflowService.getForUser(workflow.getId(), requester).getId()).isEqualTo(workflow.getId());
         assertThat(workflowService.getForUser(workflow.getId(), approver).getId()).isEqualTo(workflow.getId());
-        assertThatThrownBy(() -> workflowService.getForUser(workflow.getId(), outsider))
+        Long workflowId = workflow.getId();
+        assertThatThrownBy(() -> workflowService.getForUser(workflowId, outsider))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> workflowService.pendingTasks(requester))
                 .isInstanceOf(AccessDeniedException.class);
@@ -127,14 +128,15 @@ class ServiceBranchTest {
                 approver.getId()
         ), requester);
 
-        assertThatThrownBy(() -> approvalService.approve(workflow.getId(), otherApprover, "Not assigned"))
+        Long workflowId = workflow.getId();
+        assertThatThrownBy(() -> approvalService.approve(workflowId, otherApprover, "Not assigned"))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> approvalService.approve(999_999L, approver, "Missing"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        approvalService.approve(workflow.getId(), approver, "Approved once");
+        approvalService.approve(workflowId, approver, "Approved once");
 
-        assertThatThrownBy(() -> approvalService.approve(workflow.getId(), approver, "Approved twice"))
+        assertThatThrownBy(() -> approvalService.approve(workflowId, approver, "Approved twice"))
                 .isInstanceOf(IllegalStateException.class);
     }
 

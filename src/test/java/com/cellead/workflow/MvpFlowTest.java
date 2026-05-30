@@ -46,7 +46,8 @@ class MvpFlowTest {
                 .contains(AuditAction.WORKFLOW_SUBMITTED, AuditAction.WORKFLOW_APPROVED);
         assertThat(notificationRecords.findAll()).hasSizeGreaterThanOrEqualTo(2);
 
-        assertThatThrownBy(() -> approvalService.reject(workflow.getId(), approver, "Too late"))
+        Long workflowId = workflow.getId();
+        assertThatThrownBy(() -> approvalService.reject(workflowId, approver, "Too late"))
                 .isInstanceOf(IllegalStateException.class);
     }
 
