@@ -111,6 +111,8 @@ jobs:
     name: Run Unit Tests & Upload Coverage
     runs-on: ubuntu-latest
     needs: [snyk-sca, snyk-sast]
+    env:
+      APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -149,6 +151,7 @@ jobs:
     env:
       SPRING_PROFILES_ACTIVE: test
       APP_PORT: '8081'
+      APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
 
     steps:
       - name: Checkout code
@@ -390,6 +393,7 @@ jobs:
     env:
       SPRING_PROFILES_ACTIVE: test
       APP_PORT: '8081'
+      APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
 
     steps:
       - name: Checkout code
