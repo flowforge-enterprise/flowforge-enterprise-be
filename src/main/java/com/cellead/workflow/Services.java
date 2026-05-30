@@ -7,6 +7,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 
 @Service
 @Transactional(readOnly = true)
@@ -73,9 +74,9 @@ class AuditService {
 @Transactional
 class NotificationService {
     private final NotificationRecordRepository notifications;
-    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final SimpMessageSendingOperations messagingTemplate;
 
-    NotificationService(NotificationRecordRepository notifications, org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
+    NotificationService(NotificationRecordRepository notifications, SimpMessageSendingOperations messagingTemplate) {
         this.notifications = notifications;
         this.messagingTemplate = messagingTemplate;
     }
@@ -240,7 +241,7 @@ class ApprovalService {
         }
         workflows.save(workflow);
 
-        ApprovalRecord record = approvals.save(new ApprovalRecord(workflow, approver, decision, comment));
+        ApprovalRecord approvalRecord = approvals.save(new ApprovalRecord(workflow, approver, decision, comment));
         auditService.log(
                 decision == Decision.APPROVED ? AuditAction.WORKFLOW_APPROVED : AuditAction.WORKFLOW_REJECTED,
                 approver,
@@ -249,6 +250,6 @@ class ApprovalService {
         );
         notificationService.notify(workflow.getSubmitter(), workflow,
                 "Workflow request " + workflow.getTitle() + " was " + decision.name().toLowerCase());
-        return record;
+        return approvalRecord;
     }
 }

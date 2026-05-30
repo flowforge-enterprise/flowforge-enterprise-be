@@ -13,9 +13,9 @@ class DataSeeder {
             if (users.count() > 0) {
                 return;
             }
-            users.save(new AppUser("requester", passwordEncoder.encode("password123"), Role.REQUESTER));
-            users.save(new AppUser("approver", passwordEncoder.encode("password123"), Role.APPROVER));
-            users.save(new AppUser("admin", passwordEncoder.encode("password123"), Role.ADMIN));
+            users.save(new AppUser("requester", passwordEncoder.encode(Constants.DEFAULT_PASSWORD), Role.REQUESTER));
+            users.save(new AppUser("approver", passwordEncoder.encode(Constants.DEFAULT_PASSWORD), Role.APPROVER));
+            users.save(new AppUser("admin", passwordEncoder.encode(Constants.DEFAULT_PASSWORD), Role.ADMIN));
         };
     }
 }

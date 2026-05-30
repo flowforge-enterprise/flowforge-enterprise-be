@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 class UnitModelAndSecurityTest {
@@ -83,7 +83,7 @@ class UnitModelAndSecurityTest {
     @Test
     void notificationServiceRecordsFailureWhenWebSocketSendFails() {
         NotificationRecordRepository records = mock(NotificationRecordRepository.class);
-        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        SimpMessageSendingOperations messagingTemplate = mock(SimpMessageSendingOperations.class);
         NotificationService service = new NotificationService(records, messagingTemplate);
         AppUser requester = new AppUser("requester-notification", "hash", Role.REQUESTER);
         AppUser approver = new AppUser("approver-notification", "hash", Role.APPROVER);

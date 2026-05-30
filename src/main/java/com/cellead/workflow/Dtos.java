@@ -86,14 +86,14 @@ record ApprovalRecordResponse(
         String comment,
         Instant createdAt
 ) {
-    static ApprovalRecordResponse from(ApprovalRecord record) {
+    static ApprovalRecordResponse from(ApprovalRecord approvalRecord) {
         return new ApprovalRecordResponse(
-                record.getId(),
-                record.getWorkflow().getId(),
-                UserSummary.from(record.getApprover()),
-                record.getDecision(),
-                record.getComment(),
-                record.getCreatedAt()
+                approvalRecord.getId(),
+                approvalRecord.getWorkflow().getId(),
+                UserSummary.from(approvalRecord.getApprover()),
+                approvalRecord.getDecision(),
+                approvalRecord.getComment(),
+                approvalRecord.getCreatedAt()
         );
     }
 }
@@ -130,15 +130,15 @@ record NotificationRecordResponse(
         NotificationStatus status,
         Instant createdAt
 ) {
-    static NotificationRecordResponse from(NotificationRecord record) {
+    static NotificationRecordResponse from(NotificationRecord notificationRecord) {
         return new NotificationRecordResponse(
-                record.getId(),
-                record.getWorkflow().getId(),
-                record.getRecipient().getId(),
-                record.getChannel(),
-                record.getMessage(),
-                record.getStatus(),
-                record.getCreatedAt()
+                notificationRecord.getId(),
+                notificationRecord.getWorkflow().getId(),
+                notificationRecord.getRecipient().getId(),
+                notificationRecord.getChannel(),
+                notificationRecord.getMessage(),
+                notificationRecord.getStatus(),
+                notificationRecord.getCreatedAt()
         );
     }
 }

@@ -95,7 +95,7 @@ class ServiceBranchTest {
     void workflowAccessAndTaskGuardsAreEnforced() {
         AppUser requester = users.findByUsername("requester").orElseThrow();
         AppUser approver = users.findByUsername("approver").orElseThrow();
-        AppUser outsider = users.save(new AppUser(unique("outsider"), passwordEncoder.encode("password123"), Role.REQUESTER));
+        AppUser outsider = users.save(new AppUser(unique("outsider"), passwordEncoder.encode(Constants.DEFAULT_PASSWORD), Role.REQUESTER));
 
         WorkflowRequest workflow = workflowService.create(new CreateWorkflowRequestDto(
                 "Access guard",
@@ -117,7 +117,7 @@ class ServiceBranchTest {
     void approvalServiceRejectsWrongAssigneeNonPendingAndMissingWorkflow() {
         AppUser requester = users.findByUsername("requester").orElseThrow();
         AppUser approver = users.findByUsername("approver").orElseThrow();
-        AppUser otherApprover = users.save(new AppUser(unique("approver"), passwordEncoder.encode("password123"), Role.APPROVER));
+        AppUser otherApprover = users.save(new AppUser(unique("approver"), passwordEncoder.encode(Constants.DEFAULT_PASSWORD), Role.APPROVER));
 
         WorkflowRequest workflow = workflowService.create(new CreateWorkflowRequestDto(
                 "Approval guard",

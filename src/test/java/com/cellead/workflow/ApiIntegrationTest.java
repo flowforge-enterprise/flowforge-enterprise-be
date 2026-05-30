@@ -28,7 +28,7 @@ class ApiIntegrationTest {
 
     @Test
     void completeApprovalFlowWorksThroughHttpApis() throws Exception {
-        String requesterToken = login("requester", "password123");
+        String requesterToken = login("requester", Constants.DEFAULT_PASSWORD);
 
         String workflowJson = mockMvc.perform(post("/api/workflows")
                         .header(HttpHeaders.AUTHORIZATION, bearer(requesterToken))
@@ -52,12 +52,12 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").exists());
 
-        String approverToken = login("approver", "password123");
+        String approverToken = login("approver", Constants.DEFAULT_PASSWORD);
 
         mockMvc.perform(get("/api/approvals/tasks")
                         .header(HttpHeaders.AUTHORIZATION, bearer(approverToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == " + workflowId + ")]").exists());
+                .andExpect(jsonPath("$[?(@.id == " + workflowId + ")] ").exists());
 
         mockMvc.perform(post("/api/approvals/{workflowId}/approve", workflowId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(approverToken))
@@ -75,7 +75,7 @@ class ApiIntegrationTest {
         mockMvc.perform(get("/api/notifications/my")
                         .header(HttpHeaders.AUTHORIZATION, bearer(requesterToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.workflowId == " + workflowId + ")]").exists());
+                .andExpect(jsonPath("$[?(@.workflowId == " + workflowId + ")] ").exists());
 
         mockMvc.perform(get("/api/audit-logs")
                         .param("workflowId", String.valueOf(workflowId))
@@ -96,7 +96,7 @@ class ApiIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
 
-        String requesterToken = login("requester", "password123");
+        String requesterToken = login("requester", Constants.DEFAULT_PASSWORD);
 
         mockMvc.perform(get("/api/approvals/tasks")
                         .header(HttpHeaders.AUTHORIZATION, bearer(requesterToken)))
@@ -109,7 +109,7 @@ class ApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
 
-        String adminToken = login("admin", "password123");
+        String adminToken = login("admin", Constants.DEFAULT_PASSWORD);
 
         mockMvc.perform(get("/api/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
