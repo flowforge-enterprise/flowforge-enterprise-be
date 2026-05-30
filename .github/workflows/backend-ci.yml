@@ -113,18 +113,27 @@ jobs:
     needs: [snyk-sca, snyk-sast]
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'maven'
 
-      - name: Run Unit Tests and generate Jacoco report
-        run: mvn clean verify
+      - name: Run tests and generate JaCoCo XML report
+        run: mvn -B clean verify jacoco:report
+
+      - name: Verify JaCoCo XML report
+        run: |
+          test -f target/site/jacoco/jacoco.xml
+          echo "JaCoCo XML report generated at target/site/jacoco/jacoco.xml"
 
       - name: Upload Test Results & Reports
         if: always()
