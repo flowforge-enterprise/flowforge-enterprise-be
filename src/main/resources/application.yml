@@ -23,8 +23,9 @@ spring:
 
 app:
   jwt:
-    # Override this via APP_JWT_SECRET in deployed environments.
-    secret: ${APP_JWT_SECRET:workflow-mvp-demo-secret-key-change-before-production-123456}
+    # Do NOT hardcode a default secret here. Require APP_JWT_SECRET to be provided in the environment
+    # (for local development you can set it in an .env file or pass -DAPP_JWT_SECRET=... for JVM).
+    secret: ${APP_JWT_SECRET}
     expiration-seconds: 86400
 
 springdoc:

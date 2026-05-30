@@ -23,7 +23,7 @@ services:
       MYSQL_URL: jdbc:mysql://mysql:3306/workflow_mvp?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       MYSQL_USER: workflow
       MYSQL_PASSWORD: workflow
-      APP_JWT_SECRET: workflow-mvp-demo-secret-key-change-before-production-123456
+      # APP_JWT_SECRET should be provided by the operator (e.g. via an .env file, docker secrets, or CI/CD).
     ports:
       - "8081:8080"
     restart: always

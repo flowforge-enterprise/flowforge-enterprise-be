@@ -7,7 +7,7 @@ type: Opaque
 stringData:
   MYSQL_USER: workflow
   MYSQL_PASSWORD: workflow
-  APP_JWT_SECRET: workflow-mvp-demo-secret-key-change-before-production-123456
+  # APP_JWT_SECRET: <set this in your cluster, do NOT commit a real secret into the repo>
 
 ---
 apiVersion: apps/v1
