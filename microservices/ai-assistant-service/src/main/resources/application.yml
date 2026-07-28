@@ -1,0 +1,18 @@
+server.port: ${SERVER_PORT:8084}
+spring.application.name: ai-assistant-service
+management.endpoints.web.exposure.include: health,info,metrics,prometheus
+logging.pattern.console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level service=${spring.application.name} correlationId=%X{correlationId:-none} logger=%logger{36} msg=%msg%n"
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+  internal-key: ${INTERNAL_API_KEY}
+  notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8083}
+  ai:
+    enabled: ${AI_PROVIDER_ENABLED:false}
+    base-url: ${AI_PROVIDER_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_PROVIDER_API_KEY:}
+    model: ${AI_MODEL:gpt-4.1-mini}
+  services:
+    auth-health: ${AUTH_HEALTH_URL:http://localhost:8081/actuator/health}
+    workflow-health: ${WORKFLOW_HEALTH_URL:http://localhost:8082/actuator/health}
+    notification-health: ${NOTIFICATION_HEALTH_URL:http://localhost:8083/actuator/health}

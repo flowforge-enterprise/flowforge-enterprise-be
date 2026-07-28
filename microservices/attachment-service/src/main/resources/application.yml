@@ -1,0 +1,20 @@
+server.port: ${SERVER_PORT:8085}
+spring:
+  application.name: attachment-service
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:attachment;MODE=MySQL;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false
+  servlet.multipart:
+    max-file-size: ${ATTACHMENT_MAX_SIZE:10MB}
+    max-request-size: ${ATTACHMENT_MAX_SIZE:10MB}
+management.endpoints.web.exposure.include: health,info,metrics,prometheus
+logging.pattern.console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level service=${spring.application.name} correlationId=%X{correlationId:-none} logger=%logger{36} msg=%msg%n"
+app:
+  jwt.secret: ${APP_JWT_SECRET}
+  internal-key: ${INTERNAL_API_KEY}
+  workflow-url: ${WORKFLOW_SERVICE_URL:http://localhost:8082}
+  storage-path: ${ATTACHMENT_STORAGE_PATH:./data/attachments}

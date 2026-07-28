@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:auth;MODE=MySQL;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+logging.pattern.console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level service=${spring.application.name} correlationId=%X{correlationId:-none} logger=%logger{36} msg=%msg%n"
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:86400}
+    refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:604800}
+  login:
+    max-failed-attempts: ${MAX_FAILED_LOGIN_ATTEMPTS:5}
+    lock-seconds: ${LOGIN_LOCK_SECONDS:900}
+  internal-key: ${INTERNAL_API_KEY}
+  seed-password: ${DEFAULT_PASSWORD}
+  notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8083}

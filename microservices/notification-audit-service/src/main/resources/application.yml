@@ -1,0 +1,16 @@
+server.port: ${SERVER_PORT:8083}
+spring:
+  application.name: notification-audit-service
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:notification_audit;MODE=MySQL;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false
+management.endpoints.web.exposure.include: health,info,metrics,prometheus
+logging.pattern.console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level service=${spring.application.name} correlationId=%X{correlationId:-none} logger=%logger{36} msg=%msg%n"
+app:
+  jwt.secret: ${APP_JWT_SECRET}
+  internal-key: ${INTERNAL_API_KEY}
+  workflow-url: ${WORKFLOW_SERVICE_URL:http://localhost:8082}

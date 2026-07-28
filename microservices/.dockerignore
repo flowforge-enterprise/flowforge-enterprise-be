@@ -1,0 +1,11 @@
+**/target
+**/.git
+**/.idea
+**/.vscode
+**/data
+**/.env
+**/*.log
+**/*.pid
+**/*.mv.db
+**/*.h2.db
+docker-compose.override.yml

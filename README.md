@@ -1,6 +1,42 @@
-# Workflow MVP Backend
+# Scalable Digital Workflow Platform — Backend
 
-Spring Boot 3 backend for the MVP enterprise approval workflow.
+Spring Boot 3 backend for the SE33 Internship project.
+
+This repository preserves the original monolithic MVP at the repository root and contains the final microservice architecture under [`microservices/`](microservices).
+
+## Final Microservice Backend
+
+The final submission backend contains:
+
+- API Gateway
+- Auth and User Service
+- Workflow and Approval Service
+- Notification and Audit Service
+- AI Assistant Service
+- Attachment Service
+- Shared security library
+
+It implements multi-level approval, workflow templates, SLA escalation, secure attachments, JWT/RBAC, refresh tokens, account lockout, transactional outbox delivery, WebSocket notifications, AI-assisted form completion, on-call runbooks, Flyway migrations, Prometheus metrics and aggregated Swagger documentation.
+
+Build and verify the final backend:
+
+```bash
+cd microservices
+mvn verify
+docker compose config --quiet
+docker compose up --build
+```
+
+The final frontend should access the API Gateway at `http://localhost:8080`.
+
+See:
+
+- [Microservice setup and API documentation](microservices/README.md)
+- [Implementation and presentation evidence](microservices/docs/IMPLEMENTATION_EVIDENCE.md)
+
+## Original MVP Backend
+
+The repository-root Spring Boot application remains available as a regression baseline for the midterm MVP.
 
 ## MVP Coverage
 
