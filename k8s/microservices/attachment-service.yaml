@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: attachment-service-secret
+  namespace: flowforge
+type: Opaque
+stringData:
+  DB_PASSWORD: attachment_password
+  # APP_JWT_SECRET: <set in cluster>
+  # INTERNAL_API_KEY: <set in cluster>
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: flowforge-attachment-pvc
+  namespace: flowforge
+spec:
+  storageClassName: alicloud-disk-essd
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attachment-service
+  namespace: flowforge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: attachment-service
+  template:
+    metadata:
+      labels:
+        app: attachment-service
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: attachment-service
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/attachment-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8085
+          env:
+            - name: DB_URL
+              value: jdbc:mysql://flowforge-mysql:3306/attachment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+            - name: DB_USER
+              value: attachment_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: attachment-service-secret
+                  key: DB_PASSWORD
+            - name: APP_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: APP_JWT_SECRET
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: INTERNAL_API_KEY
+            - name: WORKFLOW_SERVICE_URL
+              value: http://workflow-service:8082
+            - name: ATTACHMENT_STORAGE_PATH
+              value: /data/attachments
+          volumeMounts:
+            - name: attachment-data
+              mountPath: /data/attachments
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8085
+            initialDelaySeconds: 40
+            periodSeconds: 15
+      volumes:
+        - name: attachment-data
+          persistentVolumeClaim:
+            claimName: flowforge-attachment-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: attachment-service
+  namespace: flowforge
+spec:
+  type: ClusterIP
+  selector:
+    app: attachment-service
+  ports:
+    - port: 8085
+      targetPort: 8085

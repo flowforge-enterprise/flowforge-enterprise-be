@@ -1,14 +1,40 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flowforge-mysql-init
+  namespace: flowforge
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS auth_db;
+    CREATE DATABASE IF NOT EXISTS workflow_db;
+    CREATE DATABASE IF NOT EXISTS notification_audit_db;
+    CREATE DATABASE IF NOT EXISTS attachment_db;
+
+    CREATE USER IF NOT EXISTS 'auth_user'@'%' IDENTIFIED BY 'auth_password';
+    CREATE USER IF NOT EXISTS 'workflow_user'@'%' IDENTIFIED BY 'workflow_password';
+    CREATE USER IF NOT EXISTS 'audit_user'@'%' IDENTIFIED BY 'audit_password';
+    CREATE USER IF NOT EXISTS 'attachment_user'@'%' IDENTIFIED BY 'attachment_password';
+
+    GRANT ALL PRIVILEGES ON auth_db.* TO 'auth_user'@'%';
+    GRANT ALL PRIVILEGES ON workflow_db.* TO 'workflow_user'@'%';
+    GRANT ALL PRIVILEGES ON notification_audit_db.* TO 'audit_user'@'%';
+    GRANT ALL PRIVILEGES ON attachment_db.* TO 'attachment_user'@'%';
+    FLUSH PRIVILEGES;
+
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: flowforge-mysql-secret
   namespace: flowforge
 type: Opaque
 stringData:
-  MYSQL_DATABASE: workflow_mvp
-  MYSQL_USER: workflow
-  MYSQL_PASSWORD: workflow
   MYSQL_ROOT_PASSWORD: root
+  # Per-service passwords — keep in sync with init.sql above
+  AUTH_DB_PASSWORD: auth_password
+  WORKFLOW_DB_PASSWORD: workflow_password
+  AUDIT_DB_PASSWORD: audit_password
+  ATTACHMENT_DB_PASSWORD: attachment_password
 
 ---
 apiVersion: v1
@@ -44,19 +70,33 @@ spec:
         - name: acr-secret
       containers:
         - name: mysql
-          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/mysql:8.4
+          image: mysql:8.4
           ports:
             - containerPort: 3306
-          envFrom:
-            - secretRef:
-                name: flowforge-mysql-secret
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
+            - name: mysql-init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$(MYSQL_ROOT_PASSWORD)", "--silent"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
       volumes:
         - name: mysql-data
           persistentVolumeClaim:
             claimName: flowforge-mysql-pvc
+        - name: mysql-init
+          configMap:
+            name: flowforge-mysql-init
 
 ---
 apiVersion: v1

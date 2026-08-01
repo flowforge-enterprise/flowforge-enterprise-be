@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-assistant-service
+  namespace: flowforge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-assistant-service
+  template:
+    metadata:
+      labels:
+        app: ai-assistant-service
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: ai-assistant-service
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/ai-assistant-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8084
+          env:
+            - name: APP_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: APP_JWT_SECRET
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: INTERNAL_API_KEY
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-audit-service:8083
+            - name: AUTH_HEALTH_URL
+              value: http://auth-service:8081/actuator/health
+            - name: WORKFLOW_HEALTH_URL
+              value: http://workflow-service:8082/actuator/health
+            - name: NOTIFICATION_HEALTH_URL
+              value: http://notification-audit-service:8083/actuator/health
+            - name: AI_PROVIDER_ENABLED
+              value: "false"
+            - name: AI_PROVIDER_BASE_URL
+              value: "https://api.openai.com/v1"
+            # AI_PROVIDER_API_KEY: set via flowforge-ai-secret if AI_PROVIDER_ENABLED=true
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 40
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-assistant-service
+  namespace: flowforge
+spec:
+  type: ClusterIP
+  selector:
+    app: ai-assistant-service
+  ports:
+    - port: 8084
+      targetPort: 8084

@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: workflow-service-secret
+  namespace: flowforge
+type: Opaque
+stringData:
+  DB_PASSWORD: workflow_password
+  # APP_JWT_SECRET: <set in cluster>
+  # INTERNAL_API_KEY: <set in cluster>
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-service
+  namespace: flowforge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workflow-service
+  template:
+    metadata:
+      labels:
+        app: workflow-service
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: workflow-service
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/workflow-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          env:
+            - name: DB_URL
+              value: jdbc:mysql://flowforge-mysql:3306/workflow_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+            - name: DB_USER
+              value: workflow_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: workflow-service-secret
+                  key: DB_PASSWORD
+            - name: APP_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: APP_JWT_SECRET
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: INTERNAL_API_KEY
+            - name: AUTH_SERVICE_URL
+              value: http://auth-service:8081
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-audit-service:8083
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 40
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-service
+  namespace: flowforge
+spec:
+  type: ClusterIP
+  selector:
+    app: workflow-service
+  ports:
+    - port: 8082
+      targetPort: 8082

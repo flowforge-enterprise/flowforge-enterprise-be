@@ -1,4 +1,4 @@
-name: Java CI with SNYK
+name: Microservices CI with SNYK
 
 on:
   push:
@@ -10,52 +10,53 @@ jobs:
   setup-build:
     name: Setup & Build
     runs-on: ubuntu-latest
-    env:
-      SPRING_PROFILES_ACTIVE: test
+    defaults:
+      run:
+        working-directory: microservices
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: microservices/pom.xml
 
-      - name: Cache Maven repository
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+      - name: Build all services (skip tests)
+        run: mvn --batch-mode clean verify -DskipTests
 
-      - name: Build project (skip tests)
-        run: mvn clean verify -DskipTests
+      - name: Validate Docker Compose config
+        run: docker compose config --quiet
 
   lint-check:
     name: Lint Check (Checkstyle)
     runs-on: ubuntu-latest
     needs: setup-build
+    defaults:
+      run:
+        working-directory: microservices
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
       - name: Run Checkstyle Lint
-        run: mvn checkstyle:checkstyle || true
+        run: mvn --batch-mode checkstyle:checkstyle || true
 
-      - name: Upload Checkstyle Report
+      - name: Upload Checkstyle Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkstyle-report
-          path: target/site/checkstyle.html
+          name: checkstyle-reports
+          path: microservices/**/target/site/checkstyle.html
 
   snyk-sca:
     name: Snyk SCA Scan
@@ -63,16 +64,17 @@ jobs:
     needs: lint-check
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    defaults:
+      run:
+        working-directory: microservices
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install Node.js 18 (for Snyk CLI)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
+      - name: Set up Node.js (for Snyk CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
       - name: Install Snyk CLI
         run: npm install -g snyk
@@ -87,16 +89,17 @@ jobs:
     needs: lint-check
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    defaults:
+      run:
+        working-directory: microservices
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install Node.js 18 (for Snyk CLI)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
+      - name: Set up Node.js (for Snyk CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
       - name: Install Snyk CLI
         run: npm install -g snyk
@@ -114,26 +117,25 @@ jobs:
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    defaults:
+      run:
+        working-directory: microservices
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'maven'
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: microservices/pom.xml
 
-      - name: Run tests and generate JaCoCo XML report
-        run: mvn -B clean verify jacoco:report
-
-      - name: Verify JaCoCo XML report
-        run: |
-          test -f target/site/jacoco/jacoco.xml
-          echo "JaCoCo XML report generated at target/site/jacoco/jacoco.xml"
+      - name: Run tests and generate JaCoCo XML reports
+        run: mvn --batch-mode clean verify jacoco:report
 
       - name: Upload Test Results & Reports
         if: always()
@@ -141,151 +143,79 @@ jobs:
         with:
           name: test-results
           path: |
-            **/target/surefire-reports/
-            **/target/site/jacoco/
-            **/target/site/checkstyle.html
+            microservices/**/target/surefire-reports/
+            microservices/**/target/site/jacoco/
 
       - name: SonarQube Scan
         run: |
-          mvn sonar:sonar \
+          mvn --batch-mode sonar:sonar \
             -Dsonar.projectKey=flowforge-enterprise-be \
             -Dsonar.organization=flowforge-enterprise \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+
   dast-scan:
     name: DAST Security Scan (OWASP ZAP)
     runs-on: ubuntu-latest
     needs: test-and-coverage
     env:
-      SPRING_PROFILES_ACTIVE: test
-      APP_PORT: '8081'
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+      INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+      DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
+      GATEWAY_PORT: "8080"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Cache Maven repository
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-
-      - name: Build application
-        run: mvn clean package -DskipTests
-
-      - name: Start Spring Boot application in background
+      - name: Start all services via Docker Compose
+        working-directory: microservices
         run: |
-          echo "Starting application with profile $SPRING_PROFILES_ACTIVE on port $APP_PORT..."
-          nohup java -jar target/*.jar \
-            --spring.profiles.active=${SPRING_PROFILES_ACTIVE} \
-            --server.port=${APP_PORT} \
-            > app.log 2>&1 &
-          echo $! > app.pid
-          echo "Application PID: $(cat app.pid)"
-          echo "Waiting 15 seconds for initial startup..."
-          sleep 15
-          echo "Checking if process is still running..."
-          if ps -p $(cat app.pid) > /dev/null; then
-            echo "✓ Application process is running"
-          else
-            echo "✗ Application process has stopped"
-            cat app.log
-            exit 1
-          fi
+          docker compose up -d
+          echo "Waiting 30s for services to initialise..."
+          sleep 30
 
-      - name: Wait for application to be ready
+      - name: Wait for api-gateway to be ready
         run: |
-          echo "=== Application Log (first 100 lines) ==="
-          head -100 app.log || true
-          echo "=== End of initial log ==="
-          echo ""
-          echo "Testing connectivity..."
-          
-          MAX_ATTEMPTS=20
+          MAX_ATTEMPTS=24
           ATTEMPT=0
           SUCCESS=false
-          
+
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             ATTEMPT=$((ATTEMPT + 1))
             echo ""
-            echo "[$ATTEMPT/$MAX_ATTEMPTS] Testing endpoints..."
-          
-            # 检查进程是否还在运行
-            if ! ps -p $(cat app.pid) > /dev/null 2>&1; then
-              echo "❌ Application process has died!"
-              echo "=== Full application log ==="
-              cat app.log
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] Checking api-gateway..."
+
+            if docker compose -f microservices/docker-compose.yml ps api-gateway | grep -q "Exit\|exited"; then
+              echo "api-gateway container has exited!"
+              docker compose -f microservices/docker-compose.yml logs api-gateway --tail=50
               exit 1
             fi
-          
-            # 尝试多个可能的端点
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$APP_PORT 2>/dev/null || echo "000")
-            echo "HTTP Status for /: $HTTP_CODE"
-          
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$GATEWAY_PORT 2>/dev/null || echo "000")
+            echo "HTTP status: $HTTP_CODE"
+
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
-              echo "✓ Application is responding!"
-              echo "Testing with curl -v:"
-              curl -v http://localhost:$APP_PORT 2>&1 | head -30
+              echo "api-gateway is ready!"
               SUCCESS=true
               break
             fi
-          
-            # 尝试API端点
-            API_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$APP_PORT/api 2>/dev/null || echo "000")
-            echo "HTTP Status for /api: $API_CODE"
-          
-            if [ "$API_CODE" = "200" ] || [ "$API_CODE" = "401" ] || [ "$API_CODE" = "403" ] || [ "$API_CODE" = "404" ]; then
-              echo "✓ Application API is responding!"
-              SUCCESS=true
-              break
-            fi
-          
-            if [ $ATTEMPT -eq 5 ] || [ $ATTEMPT -eq 10 ] || [ $ATTEMPT -eq 15 ]; then
-              echo "=== Application log tail (attempt $ATTEMPT) ==="
-              tail -30 app.log || true
-              echo "==="
-            fi
-          
+
             if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-              echo ""
-              echo "❌ Application failed to start within expected time"
-              echo ""
-              echo "=== Full Application Log ==="
-              cat app.log
-              echo ""
-              echo "=== Network check ==="
-              ss -ltnp 2>/dev/null | grep $APP_PORT || lsof -i :$APP_PORT 2>/dev/null || echo "Port $APP_PORT not listening or tooling missing"
+              echo "api-gateway failed to become ready within expected time"
+              docker compose -f microservices/docker-compose.yml logs --tail=50
               exit 1
             fi
-          
-            sleep 3
+
+            sleep 5
           done
-          
-          if [ "$SUCCESS" = "true" ]; then
-            echo ""
-            echo "✓✓✓ Application is ready for DAST scanning! ✓✓✓"
-          fi
 
       - name: Create ZAP rules configuration
         run: |
           mkdir -p .zap
           cat > .zap/rules.tsv << 'EOF'
-          # ZAP Scanning Rules - Relaxed Mode (不会导致CI失败)
-          # Use this file to configure which rules to include/exclude
-          # Format: RULE_ID	THRESHOLD	[COMMENT]
-          # THRESHOLD: IGNORE(忽略) < INFO(信息) < WARN(警告) < FAIL(失败)
-          
-          # 严重安全问题 - 仅报告，不失败构建
+          # ZAP Scanning Rules - Relaxed Mode
           10028	WARN	# Open Redirect
           10029	WARN	# Cookie Poisoning
           10033	WARN	# Directory Browsing
@@ -296,8 +226,6 @@ jobs:
           10062	WARN	# PII Disclosure
           10099	WARN	# Source Code Disclosure
           10105	WARN	# Weak Authentication Method
-          
-          # 一般安全问题 - 仅作为信息提示
           10021	INFO	# X-Content-Type-Options header missing
           10023	INFO	# Information Disclosure - Debug Error Messages
           10025	INFO	# Information Disclosure - Sensitive Information in URL
@@ -338,7 +266,7 @@ jobs:
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
-          target: "http://localhost:${{ env.APP_PORT }}"
+          target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j -I'
           fail_action: false
@@ -349,7 +277,7 @@ jobs:
       - name: OWASP ZAP Full Scan (API endpoints)
         uses: zaproxy/action-full-scan@v0.8.0
         with:
-          target: "http://localhost:${{ env.APP_PORT }}"
+          target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j -m 5'
           fail_action: false
@@ -358,13 +286,10 @@ jobs:
         timeout-minutes: 15
         if: success() || failure()
 
-      - name: Stop application
+      - name: Stop all services
         if: always()
-        run: |
-          if [ -f app.pid ]; then
-            kill $(cat app.pid) || true
-            rm app.pid
-          fi
+        working-directory: microservices
+        run: docker compose down -v
 
       - name: Upload ZAP scan reports
         if: always()
@@ -385,7 +310,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## OWASP ZAP Scan Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Target: http://localhost:${{ env.APP_PORT }}" >> $GITHUB_STEP_SUMMARY
+          echo "Target: http://localhost:${{ env.GATEWAY_PORT }} (api-gateway)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f report_md.md ]; then
             cat report_md.md >> $GITHUB_STEP_SUMMARY
@@ -400,54 +325,36 @@ jobs:
     runs-on: ubuntu-latest
     needs: dast-scan
     env:
-      SPRING_PROFILES_ACTIVE: test
-      APP_PORT: '8081'
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+      INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+      DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
+      GATEWAY_PORT: "8080"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Build application
-        run: mvn clean package -DskipTests
-
-      - name: Start Spring Boot application
+      - name: Start all services via Docker Compose
+        working-directory: microservices
         run: |
-          nohup java -jar target/*.jar \
-            --spring.profiles.active=${SPRING_PROFILES_ACTIVE} \
-            --server.port=${APP_PORT} \
-            > app.log 2>&1 &
-          echo $! > app.pid
-          sleep 20
+          docker compose up -d
+          sleep 30
 
-          if ! ps -p $(cat app.pid) > /dev/null; then
-            echo "Application failed to start"
-            cat app.log
-            exit 1
-          fi
-
-      - name: Wait for application
+      - name: Wait for api-gateway
         run: |
-          for i in {1..20}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${APP_PORT} || echo "000")
-            echo "HTTP_CODE=$HTTP_CODE"
+          for i in {1..24}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${GATEWAY_PORT} || echo "000")
+            echo "[$i/24] HTTP_CODE=$HTTP_CODE"
 
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
-              echo "Application is responding"
+              echo "api-gateway is ready"
               exit 0
             fi
-
-            sleep 3
+            sleep 5
           done
 
-          echo "Application did not become ready"
-          cat app.log
+          echo "api-gateway did not become ready"
+          docker compose -f microservices/docker-compose.yml logs --tail=50
           exit 1
 
       - name: Run k6 stress test
@@ -457,20 +364,17 @@ jobs:
             -v "$PWD/stress-test:/scripts" \
             grafana/k6 run /scripts/stress-test.js
 
-      - name: Stop application
+      - name: Stop all services
         if: always()
-        run: |
-          if [ -f app.pid ]; then
-            kill $(cat app.pid) || true
-            rm app.pid
-          fi
+        working-directory: microservices
+        run: docker compose down -v
 
-      - name: Upload stress test log
+      - name: Upload stress test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: k6-stress-test-log
-          path: app.log
+          name: k6-stress-test-results
+          path: stress-test/
 
   trigger-jenkins-cd:
     name: Trigger Jenkins CD
@@ -481,33 +385,6 @@ jobs:
     steps:
       - name: Trigger Jenkins deployment
         run: |
-             curl -X POST \
-             -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}" \
-             "${{ secrets.JENKINS_URL }}/job/flowforge-enterprise-be-pipeline/build?token=${{ secrets.JENKINS_JOB_TOKEN }}"
-
-  microservices-build-test:
-    name: Final Microservices Build & Test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: microservices
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-          cache-dependency-path: microservices/pom.xml
-
-      - name: Build and test all services
-        run: mvn --batch-mode verify
-
-      - name: Validate Docker Compose
-        run: docker compose config --quiet
-
-      - name: Build service images
-        run: docker compose build
+          curl -X POST \
+          -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_API_TOKEN }}" \
+          "${{ secrets.JENKINS_URL }}/job/flowforge-enterprise-be-pipeline/build?token=${{ secrets.JENKINS_JOB_TOKEN }}"

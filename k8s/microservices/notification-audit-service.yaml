@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notification-audit-service-secret
+  namespace: flowforge
+type: Opaque
+stringData:
+  DB_PASSWORD: audit_password
+  # APP_JWT_SECRET: <set in cluster>
+  # INTERNAL_API_KEY: <set in cluster>
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-audit-service
+  namespace: flowforge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-audit-service
+  template:
+    metadata:
+      labels:
+        app: notification-audit-service
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: notification-audit-service
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/notification-audit-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8083
+          env:
+            - name: DB_URL
+              value: jdbc:mysql://flowforge-mysql:3306/notification_audit_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+            - name: DB_USER
+              value: audit_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-audit-service-secret
+                  key: DB_PASSWORD
+            - name: APP_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: APP_JWT_SECRET
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: flowforge-shared-secret
+                  key: INTERNAL_API_KEY
+            - name: WORKFLOW_SERVICE_URL
+              value: http://workflow-service:8082
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8083
+            initialDelaySeconds: 40
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-audit-service
+  namespace: flowforge
+spec:
+  type: ClusterIP
+  selector:
+    app: notification-audit-service
+  ports:
+    - port: 8083
+      targetPort: 8083
