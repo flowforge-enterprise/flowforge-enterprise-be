@@ -22,13 +22,18 @@ controller:
     - name: JENKINS_UC_DOWNLOAD
       value: https://mirrors.tuna.tsinghua.edu.cn/jenkins
 
-  serviceType: ClusterIP
+  # Temporary public endpoint for GitHub webhooks. Prefer HTTPS Ingress for production.
+  serviceType: LoadBalancer
+  jenkinsUrl: http://115.29.194.246:8080
 
   # Jenkins Controller 不执行普通构建任务
   numExecutors: 0
 
   JCasC:
     defaultConfig: true
+
+  additionalPlugins:
+    - github:1.47.0
 
   sidecars:
     configAutoReload:
