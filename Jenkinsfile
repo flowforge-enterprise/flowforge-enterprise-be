@@ -71,6 +71,7 @@ spec:
                         userRemoteConfigs: [[url: 'https://github.com/flowforge-enterprise/flowforge-enterprise-be.git']]
                     ])
                 }
+                sh 'git config --global --add safe.directory "$WORKSPACE"'
                 script {
                     def matches = services.findAll { env.JOB_BASE_NAME == it || env.JOB_BASE_NAME.endsWith("-${it}") }
                     if (matches.size() != 1) {
