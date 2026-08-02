@@ -109,9 +109,6 @@ spec:
             steps {
                 sh 'mvn -B -ntp -f microservices/pom.xml -pl "$SERVICE_NAME" -am clean verify'
             }
-            post {
-                always { junit allowEmptyResults: true, testResults: 'microservices/**/target/surefire-reports/*.xml' }
-            }
         }
 
         stage('Build and push image') {
