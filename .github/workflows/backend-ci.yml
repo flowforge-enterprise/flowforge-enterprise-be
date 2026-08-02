@@ -29,6 +29,10 @@ jobs:
         run: mvn --batch-mode clean verify -DskipTests
 
       - name: Validate Docker Compose config
+        env:
+          APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+          DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
         run: docker compose config --quiet
 
   lint-check:
