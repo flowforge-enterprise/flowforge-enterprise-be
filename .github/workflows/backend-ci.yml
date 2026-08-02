@@ -150,6 +150,12 @@ jobs:
             microservices/**/target/surefire-reports/
             microservices/**/target/site/jacoco/
 
+      - name: Set up JDK 21 for SonarQube Cloud
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: SonarQube Scan
         run: |
           mvn --batch-mode sonar:sonar \
