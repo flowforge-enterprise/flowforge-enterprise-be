@@ -17,6 +17,10 @@ kind: Pod
 spec:
   serviceAccountName: jenkins
   containers:
+    - name: jnlp
+      image: docker.m.daocloud.io/jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
     - name: maven
       image: docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17
       command: ["sleep"]
@@ -26,7 +30,7 @@ spec:
         requests: {cpu: 500m, memory: 1Gi}
         limits: {cpu: "2", memory: 3Gi}
     - name: kaniko
-      image: docker.m.daocloud.io/gcr.io/kaniko-project/executor:v1.23.2-debug
+      image: registry.cn-hangzhou.aliyuncs.com/kube-image-repo/kaniko:v1.9.1-debug
       command: ["/busybox/cat"]
       tty: true
       resources:
@@ -60,7 +64,13 @@ spec:
     stages {
         stage('Checkout and resolve service') {
             steps {
-                checkout scm
+                retry(3) {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/master']],
+                        userRemoteConfigs: [[url: 'https://github.com/flowforge-enterprise/flowforge-enterprise-be.git']]
+                    ])
+                }
                 script {
                     def matches = services.findAll { env.JOB_BASE_NAME == it || env.JOB_BASE_NAME.endsWith("-${it}") }
                     if (matches.size() != 1) {
@@ -145,6 +155,5 @@ spec:
     post {
         success { echo "${env.SERVICE_NAME ?: 'service'} pipeline completed." }
         failure { echo 'Pipeline failed. Review the failed stage and Kubernetes events.' }
-        cleanup { deleteDir() }
     }
 }
