@@ -139,7 +139,7 @@ jobs:
           cache-dependency-path: microservices/pom.xml
 
       - name: Run tests and generate JaCoCo XML reports
-        run: mvn --batch-mode clean verify jacoco:report
+        run: mvn --batch-mode clean verify
 
       - name: Upload Test Results & Reports
         if: always()
