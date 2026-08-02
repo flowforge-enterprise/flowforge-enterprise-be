@@ -156,7 +156,7 @@ jobs:
             -Dsonar.projectKey=flowforge-enterprise-be \
             -Dsonar.organization=flowforge-enterprise \
             -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.token="$SONAR_TOKEN" \
             -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
 
   dast-scan:
