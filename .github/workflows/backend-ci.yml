@@ -312,7 +312,10 @@ jobs:
   dast-scan:
     name: DAST Security Scan (OWASP ZAP)
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.run_dast == 'true'
+    needs: [detect-changes, build-test]
+    if: |
+      (github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_dast == 'true')
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
