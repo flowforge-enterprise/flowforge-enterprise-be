@@ -70,7 +70,7 @@ spec:
         - name: acr-secret
       containers:
         - name: mysql
-          image: mysql:8.4
+          image: docker.m.daocloud.io/library/mysql:8.4
           ports:
             - containerPort: 3306
           env:

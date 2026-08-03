@@ -51,7 +51,7 @@ spec:
     options {
         disableConcurrentBuilds(abortPrevious: true)
         timestamps()
-        timeout(time: 20, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         skipDefaultCheckout(true)
     }
 
