@@ -5,11 +5,15 @@ on:
     branches: ["master"]
     paths:
       - "microservices/**"
+      - "k8s/**"
+      - "Jenkinsfile"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: ["master"]
     paths:
       - "microservices/**"
+      - "k8s/**"
+      - "Jenkinsfile"
       - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
     inputs:

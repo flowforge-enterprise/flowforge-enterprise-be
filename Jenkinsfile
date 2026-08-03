@@ -55,8 +55,15 @@ spec:
         skipDefaultCheckout(true)
     }
 
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['test', 'prod'],
+            description: 'Deploy target environment. test -> flowforge-test, prod -> flowforge-prod.'
+        )
+    }
+
     environment {
-        K8S_NAMESPACE = 'flowforge'
         ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
         IMAGE_REPOSITORY = 'nus_flowforge/flowforge-enterprise-be'
     }
@@ -78,8 +85,14 @@ spec:
                         error("Job 名必须是服务名或以服务名结尾。允许值: ${services.join(', ')}")
                     }
                     env.SERVICE_NAME = matches[0]
+                    env.TARGET_ENV = params.TARGET_ENV ?: 'test'
+                    if (!(env.TARGET_ENV in ['test', 'prod'])) {
+                        error("TARGET_ENV 只能是 test 或 prod，当前值: ${env.TARGET_ENV}")
+                    }
+                    env.K8S_NAMESPACE = "flowforge-${env.TARGET_ENV}"
                     env.SHORT_COMMIT = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
-                    env.IMAGE_TAG = "${BUILD_NUMBER}-${env.SHORT_COMMIT}"
+                    env.IMAGE_TAG = "${env.TARGET_ENV}-${BUILD_NUMBER}-${env.SHORT_COMMIT}"
+                    echo "Target environment: ${env.TARGET_ENV}; namespace: ${env.K8S_NAMESPACE}; image tag: ${env.SERVICE_NAME}-${env.IMAGE_TAG}"
                 }
             }
         }
@@ -138,13 +151,41 @@ spec:
             when { expression { env.SHOULD_BUILD == 'true' } }
             steps {
                 container('kubectl') {
-                    sh '''
+                    withCredentials([usernamePassword(credentialsId: 'acr-credential', usernameVariable: 'ACR_USERNAME', passwordVariable: 'ACR_PASSWORD')]) {
+                        sh '''
+                        set -eu
+
+                        if [ "$TARGET_ENV" = "prod" ]; then
+                          echo "Deploying to production namespace: $K8S_NAMESPACE"
+                        else
+                          echo "Deploying to test namespace: $K8S_NAMESPACE"
+                        fi
+
+                        kubectl apply -f "k8s/overlays/$TARGET_ENV/namespace.yaml"
+
+                        kubectl create secret docker-registry acr-secret \
+                          --docker-server="$ACR_REGISTRY" \
+                          --docker-username="$ACR_USERNAME" \
+                          --docker-password="$ACR_PASSWORD" \
+                          --namespace "$K8S_NAMESPACE" \
+                          --dry-run=client -o yaml | kubectl apply -f -
+
+                        if ! kubectl get secret flowforge-shared-secret --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+                          echo "ERROR: Missing required secret flowforge-shared-secret in namespace $K8S_NAMESPACE"
+                          echo "Create it before deploying:"
+                          echo "kubectl -n $K8S_NAMESPACE create secret generic flowforge-shared-secret --from-literal=APP_JWT_SECRET=... --from-literal=INTERNAL_API_KEY=... --from-literal=DEFAULT_PASSWORD=..."
+                          exit 1
+                        fi
+
+                        kubectl kustomize --load-restrictor=LoadRestrictionsNone "k8s/overlays/$TARGET_ENV" | kubectl apply -f -
+
                         kubectl set image "deployment/$SERVICE_NAME" \
                           "$SERVICE_NAME=$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
                           --namespace "$K8S_NAMESPACE"
                         kubectl rollout status "deployment/$SERVICE_NAME" \
                           --namespace "$K8S_NAMESPACE" --timeout=5m
                     '''
+                    }
                 }
             }
         }
