@@ -453,3 +453,201 @@ jobs:
         with:
           name: k6-stress-test-results
           path: stress-test/
+
+  evidence-summary:
+    name: Evidence Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - detect-changes
+      - validate-compose
+      - build-test
+      - lint-check
+      - snyk-sca
+      - snyk-sast
+      - sonar
+      - dast-scan
+      - stress-test
+    steps:
+      - name: Download evidence artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: evidence-artifacts
+          merge-multiple: false
+        continue-on-error: true
+
+      - name: Generate evidence summary
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path("evidence-artifacts")
+          needs = json.loads(os.environ["NEEDS_JSON"])
+
+          def icon(result):
+            return {
+              "success": "✅",
+              "failure": "❌",
+              "cancelled": "⚠️",
+              "skipped": "⏭️",
+            }.get(result or "unknown", "❔")
+
+          job_labels = {
+            "detect-changes": "Changed service detection",
+            "validate-compose": "Docker Compose validation",
+            "build-test": "Build, unit tests and JaCoCo coverage",
+            "lint-check": "Checkstyle quality scan",
+            "snyk-sca": "Snyk dependency security scan",
+            "snyk-sast": "Snyk code security scan",
+            "sonar": "SonarQube quality analysis",
+            "dast-scan": "OWASP ZAP DAST scan",
+            "stress-test": "k6 stress test",
+          }
+
+          def pct(covered, missed):
+            total = covered + missed
+            return "n/a" if total == 0 else f"{covered * 100 / total:.1f}%"
+
+          def module_name(path):
+            for part in path.parts:
+              if part.startswith("reports-"):
+                return part.removeprefix("reports-")
+              if part.startswith("checkstyle-"):
+                return part.removeprefix("checkstyle-")
+            return path.parent.name
+
+          coverage_rows = []
+          for xml_file in sorted(root.glob("**/jacoco.xml")):
+            module = module_name(xml_file)
+            try:
+              tree = ET.parse(xml_file)
+              counters = {c.attrib.get("type"): c.attrib for c in tree.findall(".//counter")}
+              line = counters.get("LINE", {})
+              branch = counters.get("BRANCH", {})
+              instr = counters.get("INSTRUCTION", {})
+              coverage_rows.append((
+                module,
+                pct(int(line.get("covered", 0)), int(line.get("missed", 0))),
+                pct(int(branch.get("covered", 0)), int(branch.get("missed", 0))),
+                pct(int(instr.get("covered", 0)), int(instr.get("missed", 0))),
+              ))
+            except Exception as exc:
+              coverage_rows.append((module, f"parse error: {exc}", "n/a", "n/a"))
+
+          test_rows = []
+          for report in sorted(root.glob("**/TEST-*.xml")):
+            module = module_name(report)
+            try:
+              suite = ET.parse(report).getroot()
+              tests = int(float(suite.attrib.get("tests", 0)))
+              failures = int(float(suite.attrib.get("failures", 0)))
+              errors = int(float(suite.attrib.get("errors", 0)))
+              skipped = int(float(suite.attrib.get("skipped", 0)))
+              existing = next((r for r in test_rows if r[0] == module), None)
+              if existing:
+                existing[1] += tests
+                existing[2] += failures
+                existing[3] += errors
+                existing[4] += skipped
+              else:
+                test_rows.append([module, tests, failures, errors, skipped])
+            except Exception:
+              pass
+
+          zap_reports = sorted(root.glob("**/report_json.json"))
+          zap_summary = "No ZAP JSON report artifact found."
+          if zap_reports:
+            try:
+              data = json.loads(zap_reports[0].read_text())
+              alerts = data.get("site", [{}])[0].get("alerts", []) if isinstance(data.get("site"), list) else []
+              counts = {}
+              for alert in alerts:
+                risk = alert.get("riskdesc", alert.get("risk", "Unknown")).split()[0]
+                counts[risk] = counts.get(risk, 0) + 1
+              zap_summary = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "No alerts reported."
+            except Exception as exc:
+              zap_summary = f"ZAP JSON parse error: {exc}"
+
+          artifacts = sorted(p.name for p in root.iterdir()) if root.exists() else []
+
+          lines = []
+          lines.append("# CI/CD Evidence Summary")
+          lines.append("")
+          lines.append(f"- Run: {os.environ['RUN_URL']}")
+          lines.append(f"- Branch: `{os.environ['REF_NAME']}`")
+          lines.append(f"- Commit: `{os.environ['COMMIT_SHA'][:12]}`")
+          lines.append("")
+          lines.append("## Pipeline Evidence")
+          lines.append("")
+          lines.append("| Evidence area | Job result |")
+          lines.append("|---|---|")
+          for key, label in job_labels.items():
+            result = needs.get(key, {}).get("result", "unknown")
+            lines.append(f"| {label} | {icon(result)} `{result}` |")
+
+          lines.append("")
+          lines.append("## Coverage Evidence")
+          lines.append("")
+          if coverage_rows:
+            lines.append("| Module | Line | Branch | Instruction |")
+            lines.append("|---|---:|---:|---:|")
+            for row in coverage_rows:
+              lines.append(f"| `{row[0]}` | {row[1]} | {row[2]} | {row[3]} |")
+          else:
+            lines.append("No JaCoCo XML reports were found in downloaded artifacts.")
+
+          lines.append("")
+          lines.append("## Test Evidence")
+          lines.append("")
+          if test_rows:
+            lines.append("| Module | Tests | Failures | Errors | Skipped |")
+            lines.append("|---|---:|---:|---:|---:|")
+            for module, tests, failures, errors, skipped in sorted(test_rows):
+              lines.append(f"| `{module}` | {tests} | {failures} | {errors} | {skipped} |")
+          else:
+            lines.append("No Surefire XML reports were found in downloaded artifacts.")
+
+          lines.append("")
+          lines.append("## Quality Evidence")
+          lines.append("")
+          lines.append("- SonarQube evidence is produced by the `SonarQube Scan` job.")
+          lines.append("- Checkstyle HTML evidence is uploaded as `checkstyle-*` artifacts when generated.")
+
+          lines.append("")
+          lines.append("## Security Evidence")
+          lines.append("")
+          lines.append("- Snyk SCA evidence is produced by the `Snyk SCA Scan` job.")
+          lines.append("- Snyk SAST evidence is produced by the `Snyk SAST Scan` job.")
+          lines.append(f"- OWASP ZAP DAST summary: {zap_summary}")
+
+          lines.append("")
+          lines.append("## Downloadable Evidence Artifacts")
+          lines.append("")
+          if artifacts:
+            for artifact in artifacts:
+              lines.append(f"- `{artifact}`")
+          else:
+            lines.append("No artifacts were downloaded. Earlier jobs may have been skipped.")
+
+          summary = "\n".join(lines) + "\n"
+          pathlib.Path("ci-evidence-summary.md").write_text(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+            fh.write(summary)
+          PY
+
+      - name: Upload evidence summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-evidence-summary
+          path: ci-evidence-summary.md
+          if-no-files-found: error
+          retention-days: 30
