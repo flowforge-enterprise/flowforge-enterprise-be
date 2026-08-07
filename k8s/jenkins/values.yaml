@@ -25,7 +25,7 @@ controller:
       value: https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/current/plugin-versions.json
 
   # Temporary public endpoint for GitHub webhooks. Prefer HTTPS Ingress for production.
-  serviceType: ClusterIP
+  serviceType: LoadBalancer
   jenkinsUrl: http://47.96.133.39:8080
 
   # Jenkins Controller 不执行普通构建任务
