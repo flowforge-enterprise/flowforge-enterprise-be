@@ -18,13 +18,15 @@ controller:
 
   initContainerEnv:
     - name: JENKINS_UC
-      value: https://updates.jenkins.io/update-center.json
+      value: https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/current/update-center.json
     - name: JENKINS_UC_DOWNLOAD
       value: https://mirrors.tuna.tsinghua.edu.cn/jenkins
+    - name: JENKINS_PLUGIN_INFO
+      value: https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/current/plugin-versions.json
 
   # Temporary public endpoint for GitHub webhooks. Prefer HTTPS Ingress for production.
   serviceType: LoadBalancer
-  jenkinsUrl: http://115.29.194.246:8080
+  jenkinsUrl: http://47.96.133.39:8080
 
   # Jenkins Controller 不执行普通构建任务
   numExecutors: 0
@@ -32,8 +34,9 @@ controller:
   JCasC:
     defaultConfig: true
 
-  additionalPlugins:
-    - github:1.47.0
+  installPlugins: false
+  additionalPlugins: []
+  initializeOnce: true
 
   sidecars:
     configAutoReload:
