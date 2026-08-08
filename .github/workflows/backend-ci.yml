@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       modules: ${{ steps.detect.outputs.modules }}
+      sonar_modules: ${{ steps.detect.outputs.sonar_modules }}
       has_changes: ${{ steps.detect.outputs.has_changes }}
       run_compose_checks: ${{ steps.detect.outputs.run_compose_checks }}
       run_iac_checks: ${{ steps.detect.outputs.run_iac_checks }}
@@ -74,6 +75,7 @@ jobs:
           cat /tmp/changed-files.txt
 
           declare -A SELECTED=()
+          declare -A SONAR_SELECTED=()
           COMMON_CHANGED=false
           SECURITY_CHANGED=false
           COMPOSE_CHANGED=false
@@ -98,6 +100,7 @@ jobs:
             for SERVICE in "${SERVICES[@]}"; do
               if [[ "$FILE_PATH" == "microservices/$SERVICE/"* ]]; then
                 SELECTED["$SERVICE"]=1
+                SONAR_SELECTED["$SERVICE"]=1
               fi
             done
           done < /tmp/changed-files.txt
@@ -105,12 +108,16 @@ jobs:
           if [ "$COMMON_CHANGED" = true ]; then
             for SERVICE in "${SERVICES[@]}"; do
               SELECTED["$SERVICE"]=1
+              SONAR_SELECTED["$SERVICE"]=1
             done
+            SONAR_SELECTED["platform-security"]=1
           fi
 
           if [ "$SECURITY_CHANGED" = true ]; then
+            SONAR_SELECTED["platform-security"]=1
             for SERVICE in auth-service workflow-service notification-audit-service ai-assistant-service attachment-service; do
               SELECTED["$SERVICE"]=1
+              SONAR_SELECTED["$SERVICE"]=1
             done
           fi
 
@@ -133,6 +140,20 @@ jobs:
             echo "modules=$JSON" >> "$GITHUB_OUTPUT"
             echo 'has_changes=true' >> "$GITHUB_OUTPUT"
           fi
+
+          SONAR_MODULES=()
+          for MODULE in platform-security "${SERVICES[@]}"; do
+            if [ "${SONAR_SELECTED[$MODULE]+set}" = "set" ]; then
+              SONAR_MODULES+=("$MODULE")
+            fi
+          done
+
+          SONAR_JSON="["
+          for MODULE in "${SONAR_MODULES[@]}"; do
+            SONAR_JSON="${SONAR_JSON}\"${MODULE}\","
+          done
+          SONAR_JSON="${SONAR_JSON%,}]"
+          echo "sonar_modules=$SONAR_JSON" >> "$GITHUB_OUTPUT"
 
           if [ "$COMPOSE_CHANGED" = true ] || [ "$COMMON_CHANGED" = true ]; then
             echo 'run_compose_checks=true' >> "$GITHUB_OUTPUT"
@@ -534,10 +555,14 @@ jobs:
           retention-days: 30
 
   sonar:
-    name: SonarQube Scan
+    name: SonarQube Scan (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    if: needs.detect-changes.outputs.sonar_modules != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.detect-changes.outputs.sonar_modules) }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     defaults:
@@ -557,14 +582,23 @@ jobs:
           cache: maven
           cache-dependency-path: microservices/pom.xml
 
-      - name: Run SonarQube scan
+      - name: Build and test selected module
         run: |
-          mvn --batch-mode -ntp clean verify sonar:sonar \
-            -Dsonar.projectKey=flowforge-enterprise-be \
+          mvn --batch-mode -ntp \
+            -pl "${{ matrix.module }}" -am \
+            clean install
+
+      - name: Run SonarQube scan for selected module
+        run: |
+          mvn --batch-mode -ntp \
+            -f "${{ matrix.module }}/pom.xml" \
+            sonar:sonar \
+            -Dsonar.projectKey="flowforge-enterprise-${{ matrix.module }}" \
+            -Dsonar.projectName="FlowForge ${{ matrix.module }}" \
             -Dsonar.organization=flowforge-enterprise \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token="$SONAR_TOKEN" \
-            -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
   dast-scan:
     name: Deploy Test Environment & DAST (OWASP ZAP)
