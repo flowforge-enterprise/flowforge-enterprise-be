@@ -21,51 +21,77 @@ import reactor.core.publisher.Mono;
 
 @Component
 final class GatewaySecurityFilter implements GlobalFilter, Ordered {
-    private final SecretKey key;
-    private final ObjectMapper mapper;
+  private final SecretKey key;
+  private final ObjectMapper mapper;
 
-    GatewaySecurityFilter(@Value("${app.jwt-secret}") String secret, ObjectMapper mapper) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.mapper = mapper;
-    }
+  GatewaySecurityFilter(@Value("${app.jwt-secret}") String secret, ObjectMapper mapper) {
+    this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    this.mapper = mapper;
+  }
 
-    @Override public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String path = exchange.getRequest().getPath().value();
-        if (isPublic(path)) return chain.filter(exchange);
-        String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith("Bearer ")) return unauthorized(exchange, "Authentication is required");
-        try {
-            var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(header.substring(7)).getPayload();
-            if (!"access".equals(claims.get("token_type", String.class))) {
-                return unauthorized(exchange, "Access token required");
-            }
-            var request = exchange.getRequest().mutate()
-                    .header("X-Authenticated-User", claims.getSubject())
-                    .header("X-Authenticated-Role", claims.get("role", String.class))
-                    .build();
-            return chain.filter(exchange.mutate().request(request).build());
-        } catch (RuntimeException ex) {
-            return unauthorized(exchange, "Token is invalid or expired");
-        }
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    String path = exchange.getRequest().getPath().value();
+    if (isPublic(path)) {
+      return chain.filter(exchange);
     }
+    String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+    if (header == null || !header.startsWith("Bearer ")) {
+      return unauthorized(exchange, "Authentication is required");
+    }
+    try {
+      var claims =
+          Jwts.parser().verifyWith(key).build().parseSignedClaims(header.substring(7)).getPayload();
+      if (!"access".equals(claims.get("token_type", String.class))) {
+        return unauthorized(exchange, "Access token required");
+      }
+      var request =
+          exchange
+              .getRequest()
+              .mutate()
+              .header("X-Authenticated-User", claims.getSubject())
+              .header("X-Authenticated-Role", claims.get("role", String.class))
+              .build();
+      return chain.filter(exchange.mutate().request(request).build());
+    } catch (RuntimeException ex) {
+      return unauthorized(exchange, "Token is invalid or expired");
+    }
+  }
 
-    private boolean isPublic(String path) {
-        return path.equals("/api/auth/login") || path.equals("/api/auth/refresh") || path.startsWith("/actuator/") || path.startsWith("/docs/")
-                || path.startsWith("/swagger-ui") || path.startsWith("/webjars/") || path.equals("/v3/api-docs/swagger-config");
-    }
+  private boolean isPublic(String path) {
+    return path.equals("/api/auth/login")
+        || path.equals("/api/auth/refresh")
+        || path.startsWith("/actuator/")
+        || path.startsWith("/docs/")
+        || path.startsWith("/swagger-ui")
+        || path.startsWith("/webjars/")
+        || path.equals("/v3/api-docs/swagger-config");
+  }
 
-    private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        try {
-            byte[] bytes = mapper.writeValueAsBytes(Map.of(
-                    "error", "UNAUTHORIZED", "message", message, "timestamp", Instant.now().toString(),
-                    "correlationId", exchange.getResponse().getHeaders().getFirst("X-Correlation-ID")));
-            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
-            return exchange.getResponse().writeWith(Mono.just(buffer));
-        } catch (Exception ex) {
-            return exchange.getResponse().setComplete();
-        }
+  private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
+    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+    exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+    try {
+      byte[] bytes =
+          mapper.writeValueAsBytes(
+              Map.of(
+                  "error",
+                  "UNAUTHORIZED",
+                  "message",
+                  message,
+                  "timestamp",
+                  Instant.now().toString(),
+                  "correlationId",
+                  exchange.getResponse().getHeaders().getFirst("X-Correlation-ID")));
+      DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
+      return exchange.getResponse().writeWith(Mono.just(buffer));
+    } catch (Exception ex) {
+      return exchange.getResponse().setComplete();
     }
-    @Override public int getOrder() { return -90; }
+  }
+
+  @Override
+  public int getOrder() {
+    return -90;
+  }
 }
