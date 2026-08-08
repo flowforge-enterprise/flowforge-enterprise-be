@@ -17,12 +17,6 @@ on:
       - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
     inputs:
-      run_dast:
-        description: "Run OWASP ZAP DAST scan"
-        required: false
-        default: "false"
-        type: choice
-        options: ["false", "true"]
       run_stress:
         description: "Run k6 stress test"
         required: false
@@ -647,12 +641,10 @@ jobs:
     needs: [detect-changes, integration-container-evidence]
     if: |
       always() &&
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
       needs.integration-container-evidence.result != 'failure' &&
-      needs.integration-container-evidence.result != 'cancelled' &&
-      (
-        (github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true') ||
-        (github.event_name == 'workflow_dispatch' && inputs.run_dast == 'true')
-      )
+      needs.integration-container-evidence.result != 'cancelled'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
