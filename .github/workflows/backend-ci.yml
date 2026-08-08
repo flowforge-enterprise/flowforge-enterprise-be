@@ -320,12 +320,14 @@ jobs:
       - name: Run Checkov IaC scan
         run: |
           mkdir -p evidence/iac
-          python3 -m checkov \
+          CHECKOV_BIN="$(python3 -m site --user-base)/bin/checkov"
+          "$CHECKOV_BIN" \
             --directory k8s \
             --framework kubernetes \
             --output json \
             --soft-fail \
-            > evidence/iac/checkov-kubernetes.json || true
+            > evidence/iac/checkov-kubernetes.json \
+            2> evidence/iac/checkov-stderr.log || true
 
       - name: Upload IaC scan evidence
         if: always()
