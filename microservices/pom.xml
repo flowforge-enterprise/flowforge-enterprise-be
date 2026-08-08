@@ -18,6 +18,9 @@
         <springdoc.version>2.8.17</springdoc.version>
         <jacoco.version>0.8.12</jacoco.version>
         <sonar-maven-plugin.version>4.0.0.4121</sonar-maven-plugin.version>
+        <jackson-bom.version>2.21.5</jackson-bom.version>
+        <logback.version>1.5.36</logback.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
     </properties>
     <modules>
         <module>platform-security</module>
