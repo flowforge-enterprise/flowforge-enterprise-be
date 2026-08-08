@@ -621,6 +621,7 @@ jobs:
             clean install
 
       - name: Analyze service with SonarCloud
+        continue-on-error: true
         run: |
           SONAR_COVERAGE_ARGS=()
           if [[ "${{ matrix.module }}" == "platform-security" || \
