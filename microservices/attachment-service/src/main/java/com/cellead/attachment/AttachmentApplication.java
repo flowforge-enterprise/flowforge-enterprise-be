@@ -23,6 +23,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +85,7 @@ public class AttachmentApplication {
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
-    return http.csrf(c -> c.disable())
+    return http.csrf(c -> c.ignoringRequestMatchers("/api/**"))
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(h -> SecurityJsonHandlers.configure(h, mapper))
         .authorizeHttpRequests(
@@ -339,7 +340,7 @@ class AttachmentController {
   void delete(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
     AttachmentRecord a = get(id);
     authorize(a.workflowId, user);
-    if (!"ADMIN".equals(user.role()) && !a.uploaderId.equals(user.id())) {
+    if (!"ADMIN".equals(user.role()) && !Objects.equals(a.uploaderId, user.id())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only uploader or admin can delete");
     }
     attachments.delete(a);

@@ -32,7 +32,7 @@ on:
 
 jobs:
   detect-changes:
-    name: Detect Changed Services
+    name: Changes | Detect affected services
     runs-on: ubuntu-latest
     outputs:
       modules: ${{ steps.detect.outputs.modules }}
@@ -40,12 +40,12 @@ jobs:
       run_compose_checks: ${{ steps.detect.outputs.run_compose_checks }}
       run_iac_checks: ${{ steps.detect.outputs.run_iac_checks }}
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changed Maven modules
+      - name: Detect affected Maven modules
         id: detect
         shell: bash
         run: |
@@ -148,7 +148,7 @@ jobs:
           fi
 
   validate-compose:
-    name: Validate Docker Compose
+    name: Validation | Docker Compose
     runs-on: ubuntu-latest
     needs: [detect-changes, build-test]
     if: |
@@ -160,10 +160,10 @@ jobs:
       run:
         working-directory: microservices
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Validate Docker Compose config
+      - name: Validate Docker Compose configuration
         env:
           APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
           INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -171,7 +171,7 @@ jobs:
         run: docker compose config --quiet
 
   integration-container-evidence:
-    name: Integration Test & Container Evidence
+    name: Test | Integration and container evidence
     runs-on: ubuntu-latest
     needs: [detect-changes, trivy-image-scan, validate-compose]
     if: |
@@ -187,15 +187,15 @@ jobs:
       DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
       GATEWAY_PORT: "8080"
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Start services for integration smoke test
+      - name: Start services for integration testing
         working-directory: microservices
         run: |
           docker compose up -d --build
 
-      - name: Run integration smoke checks
+      - name: Run integration smoke tests
         run: |
           set -euo pipefail
           mkdir -p evidence/integration evidence/container-inspection evidence/container-logs
@@ -275,7 +275,7 @@ jobs:
           wait_http "ai-assistant-health" "http://localhost:8084/actuator/health" "200"
           wait_http "attachment-health" "http://localhost:8085/actuator/health" "200"
 
-      - name: Capture container inspection evidence
+      - name: Collect container inspection evidence
         if: always()
         run: |
           mkdir -p evidence/container-inspection evidence/container-logs
@@ -296,18 +296,18 @@ jobs:
             echo "No docker compose containers found." > evidence/container-inspection/docker-inspect.json
           fi
 
-      - name: Capture container logs
+      - name: Collect container logs
         if: always()
         run: |
           mkdir -p evidence/container-logs
           docker compose -f microservices/docker-compose.yml logs --no-color > evidence/container-logs/docker-compose.log || true
 
-      - name: Stop services
+      - name: Stop integration services
         if: always()
         working-directory: microservices
         run: docker compose down -v
 
-      - name: Upload integration and container evidence
+      - name: Upload integration evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -317,12 +317,12 @@ jobs:
           retention-days: 30
 
   iac-scan:
-    name: Infrastructure-as-Code Scan (Checkov)
+    name: Security | Checkov IaC scan
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.run_iac_checks == 'true'
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Install Checkov
@@ -330,7 +330,7 @@ jobs:
 
       # Checkov is evidence-only for now; remove --soft-fail / || true later
       # if you want IaC policy violations to block the pipeline.
-      - name: Run Checkov IaC scan
+      - name: Scan Kubernetes manifests with Checkov
         run: |
           mkdir -p evidence/iac
           CHECKOV_BIN="$(python3 -m site --user-base)/bin/checkov"
@@ -342,7 +342,7 @@ jobs:
             > evidence/iac/checkov-kubernetes.json \
             2> evidence/iac/checkov-stderr.log || true
 
-      - name: Upload IaC scan evidence
+      - name: Upload Checkov evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -352,7 +352,7 @@ jobs:
           retention-days: 30
 
   build-test:
-    name: Build & Test (${{ matrix.module }})
+    name: Test | Build and unit test (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: [detect-changes, lint-check, sonar, snyk-sca, snyk-sast, iac-scan]
     if: |
@@ -376,12 +376,12 @@ jobs:
       run:
         working-directory: microservices
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -389,10 +389,10 @@ jobs:
           cache: maven
           cache-dependency-path: microservices/pom.xml
 
-      - name: Build and test selected service
+      - name: Build and test service
         run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am clean verify
 
-      - name: Upload test and coverage reports
+      - name: Upload test and coverage evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -402,7 +402,7 @@ jobs:
             microservices/${{ matrix.module }}/target/site/jacoco/
 
   lint-check:
-    name: Lint Check (${{ matrix.module }})
+    name: Quality | Checkstyle (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
@@ -414,10 +414,10 @@ jobs:
       run:
         working-directory: microservices
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -425,10 +425,10 @@ jobs:
           cache: maven
           cache-dependency-path: microservices/pom.xml
 
-      - name: Run Checkstyle for selected service
+      - name: Run Checkstyle
         run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am checkstyle:check
 
-      - name: Upload Checkstyle report
+      - name: Upload Checkstyle evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -436,7 +436,7 @@ jobs:
           path: microservices/${{ matrix.module }}/target/site/checkstyle.html
 
   snyk-sca:
-    name: Snyk SCA Scan (${{ matrix.module }})
+    name: Security | Snyk SCA (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
@@ -450,7 +450,7 @@ jobs:
       run:
         working-directory: microservices/${{ matrix.module }}
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -461,11 +461,11 @@ jobs:
       - name: Install Snyk CLI
         run: npm install -g snyk
 
-      - name: Run Snyk SCA scan for selected service
+      - name: Scan dependencies with Snyk
         run: snyk test --file=pom.xml --severity-threshold=high
 
   snyk-sast:
-    name: Snyk SAST Scan (${{ matrix.module }})
+    name: Security | Snyk Code (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
@@ -479,7 +479,7 @@ jobs:
       run:
         working-directory: microservices/${{ matrix.module }}
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -490,11 +490,11 @@ jobs:
       - name: Install Snyk CLI
         run: npm install -g snyk
 
-      - name: Run Snyk Code scan for selected service
+      - name: Scan source code with Snyk Code
         run: snyk code test --severity-threshold=high
 
   trivy-image-scan:
-    name: Container Image Security Scan (Trivy) (${{ matrix.module }})
+    name: Security | Trivy image scan (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: [detect-changes, build-test]
     if: |
@@ -509,10 +509,10 @@ jobs:
       run:
         working-directory: microservices
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build local container image
+      - name: Build service container image
         run: |
           docker build \
             -f Dockerfile \
@@ -520,7 +520,7 @@ jobs:
             -t "flowforge/${{ matrix.module }}:${{ github.sha }}" \
             .
 
-      - name: Run Trivy vulnerability scan (evidence)
+      - name: Generate Trivy vulnerability evidence
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "flowforge/${{ matrix.module }}:${{ github.sha }}"
@@ -531,7 +531,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
 
-      - name: Enforce Trivy HIGH/CRITICAL security gate
+      - name: Enforce Trivy high and critical severity gate
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "flowforge/${{ matrix.module }}:${{ github.sha }}"
@@ -541,7 +541,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
-      - name: Upload Trivy image scan report
+      - name: Upload Trivy evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -551,7 +551,7 @@ jobs:
           retention-days: 30
 
   sonar:
-    name: SonarQube Scan (${{ matrix.module }})
+    name: Quality | SonarCloud (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
@@ -565,12 +565,12 @@ jobs:
       run:
         working-directory: microservices
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 21 for SonarQube Cloud
+      - name: Set up Java 21 for SonarCloud
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -578,7 +578,7 @@ jobs:
           cache: maven
           cache-dependency-path: microservices/pom.xml
 
-      - name: Resolve SonarQube project key
+      - name: Resolve SonarCloud project key
         id: sonar-key
         shell: bash
         run: |
@@ -607,22 +607,27 @@ jobs:
               PROJECT_KEY="flowforge-enterprise-platform-security"
               ;;
             *)
-              echo "No SonarQube project key configured for ${{ matrix.module }}."
+              echo "No SonarCloud project key configured for ${{ matrix.module }}."
               exit 1
               ;;
           esac
 
           echo "project_key=$PROJECT_KEY" >> "$GITHUB_OUTPUT"
-          echo "SonarQube project: $PROJECT_KEY"
+          echo "SonarCloud project: $PROJECT_KEY"
 
-      - name: Build and test selected service
+      - name: Build and test service
         run: |
           mvn --batch-mode -ntp \
             -pl "${{ matrix.module }}" -am \
             clean install
 
-      - name: Run SonarQube scan for selected service
+      - name: Analyze service with SonarCloud
         run: |
+          SONAR_COVERAGE_ARGS=()
+          if [[ "${{ matrix.module }}" == "platform-security" ]]; then
+            SONAR_COVERAGE_ARGS+=("-Dsonar.coverage.exclusions=**")
+          fi
+
           mvn --batch-mode -ntp \
             -f "${{ matrix.module }}/pom.xml" \
             sonar:sonar \
@@ -632,10 +637,11 @@ jobs:
             -Dsonar.token="$SONAR_TOKEN" \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=300 \
-            -Dsonar.coverage.jacoco.xmlReportPaths="target/site/jacoco/jacoco.xml"
+            -Dsonar.coverage.jacoco.xmlReportPaths="target/site/jacoco/jacoco.xml" \
+            "${SONAR_COVERAGE_ARGS[@]}"
 
   dast-scan:
-    name: Deploy Test Environment & DAST (OWASP ZAP)
+    name: Security | OWASP ZAP DAST
     runs-on: ubuntu-latest
     needs: [detect-changes, integration-container-evidence]
     if: |
@@ -652,16 +658,16 @@ jobs:
       DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
       GATEWAY_PORT: "8080"
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Start all services via Docker Compose
+      - name: Start services for DAST
         working-directory: microservices
         run: |
           docker compose up -d
           sleep 30
 
-      - name: Wait for api-gateway to be ready
+      - name: Wait for API Gateway readiness
         run: |
           for i in {1..24}; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GATEWAY_PORT}" || echo "000")
@@ -674,7 +680,7 @@ jobs:
           docker compose -f microservices/docker-compose.yml logs --tail=80
           exit 1
 
-      - name: Create ZAP rules configuration
+      - name: Configure OWASP ZAP rules
         run: |
           mkdir -p .zap
           cat > .zap/rules.tsv << 'EOF'
@@ -691,7 +697,7 @@ jobs:
           EOF
 
       # ZAP is evidence-only for now (continue-on-error + fail_action=false).
-      - name: OWASP ZAP Baseline Scan
+      - name: Run OWASP ZAP baseline scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
@@ -702,7 +708,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
 
-      - name: OWASP ZAP Full Scan
+      - name: Run OWASP ZAP full scan
         uses: zaproxy/action-full-scan@v0.8.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
@@ -713,12 +719,12 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
 
-      - name: Stop all services
+      - name: Stop DAST services
         if: always()
         working-directory: microservices
         run: docker compose down -v
 
-      - name: Upload ZAP scan reports
+      - name: Upload OWASP ZAP evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -731,7 +737,7 @@ jobs:
           retention-days: 30
 
   stress-test:
-    name: Stress Test with k6
+    name: Performance | k6 stress test
     runs-on: ubuntu-latest
     needs: [detect-changes, dast-scan]
     if: |
@@ -746,16 +752,16 @@ jobs:
       DEFAULT_PASSWORD: ${{ secrets.DEFAULT_PASSWORD }}
       GATEWAY_PORT: "8080"
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Start all services via Docker Compose
+      - name: Start services for stress testing
         working-directory: microservices
         run: |
           docker compose up -d
           sleep 30
 
-      - name: Wait for api-gateway
+      - name: Wait for API Gateway readiness
         run: |
           for i in {1..24}; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GATEWAY_PORT}" || echo "000")
@@ -775,12 +781,12 @@ jobs:
             -v "$PWD/stress-test:/scripts" \
             grafana/k6 run /scripts/stress-test.js
 
-      - name: Stop all services
+      - name: Stop stress-test services
         if: always()
         working-directory: microservices
         run: docker compose down -v
 
-      - name: Upload stress test artifacts
+      - name: Upload k6 evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -788,7 +794,7 @@ jobs:
           path: stress-test/
 
   evidence-summary:
-    name: Evidence Summary
+    name: Evidence | Generate CI summary
     runs-on: ubuntu-latest
     if: always()
     needs:
@@ -805,14 +811,14 @@ jobs:
       - dast-scan
       - stress-test
     steps:
-      - name: Download evidence artifacts
+      - name: Download CI evidence
         uses: actions/download-artifact@v4
         with:
           path: evidence-artifacts
           merge-multiple: false
         continue-on-error: true
 
-      - name: Generate evidence summary
+      - name: Generate CI evidence summary
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -846,7 +852,7 @@ jobs:
             "snyk-sca": "Snyk dependency security scan",
             "snyk-sast": "Snyk code security scan",
             "trivy-image-scan": "Trivy container image security scan",
-            "sonar": "SonarQube quality analysis",
+            "sonar": "SonarCloud quality analysis",
             "dast-scan": "Test environment deployment and OWASP ZAP DAST scan",
             "stress-test": "k6 stress test",
           }
@@ -1017,7 +1023,7 @@ jobs:
           lines.append("")
           lines.append("## Quality Evidence")
           lines.append("")
-          lines.append("- SonarQube evidence is produced by the `SonarQube Scan` job.")
+          lines.append("- SonarCloud evidence is produced by the `Quality | SonarCloud` job.")
           lines.append("- Checkstyle HTML evidence is uploaded as `checkstyle-*` artifacts when generated.")
 
           lines.append("")
@@ -1076,7 +1082,7 @@ jobs:
             fh.write(summary)
           PY
 
-      - name: Upload evidence summary
+      - name: Upload CI evidence summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -1084,3 +1090,80 @@ jobs:
           path: ci-evidence-summary.md
           if-no-files-found: error
           retention-days: 30
+
+  trigger-jenkins:
+    name: Deployment | Trigger Jenkins
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - validate-compose
+      - integration-container-evidence
+      - iac-scan
+      - build-test
+      - lint-check
+      - snyk-sca
+      - snyk-sast
+      - trivy-image-scan
+      - sonar
+      - dast-scan
+      - stress-test
+      - evidence-summary
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.detect-changes.result == 'success' &&
+      needs.validate-compose.result != 'failure' &&
+      needs.validate-compose.result != 'cancelled' &&
+      needs.integration-container-evidence.result != 'failure' &&
+      needs.integration-container-evidence.result != 'cancelled' &&
+      needs.iac-scan.result != 'failure' &&
+      needs.iac-scan.result != 'cancelled' &&
+      needs.build-test.result == 'success' &&
+      needs.lint-check.result == 'success' &&
+      needs.snyk-sca.result == 'success' &&
+      needs.snyk-sast.result == 'success' &&
+      needs.trivy-image-scan.result == 'success' &&
+      needs.sonar.result == 'success' &&
+      needs.dast-scan.result != 'failure' &&
+      needs.dast-scan.result != 'cancelled' &&
+      needs.stress-test.result != 'failure' &&
+      needs.stress-test.result != 'cancelled' &&
+      needs.evidence-summary.result == 'success'
+    env:
+      JENKINS_URL: ${{ secrets.JENKINS_URL }}
+      JENKINS_USER: ${{ secrets.JENKINS_USER }}
+      JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
+      JENKINS_JOB_TOKEN: ${{ secrets.JENKINS_JOB_TOKEN }}
+      CHANGED_MODULES: ${{ needs.detect-changes.outputs.modules }}
+    steps:
+      - name: Trigger deployments for affected services
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          JENKINS_BASE_URL="${JENKINS_URL%/}"
+          CRUMB_HEADER=()
+          if CRUMB_JSON=$(curl --fail --silent --show-error \
+              --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
+              "$JENKINS_BASE_URL/crumbIssuer/api/json"); then
+            CRUMB_FIELD=$(jq -r '.crumbRequestField' <<< "$CRUMB_JSON")
+            CRUMB_VALUE=$(jq -r '.crumb' <<< "$CRUMB_JSON")
+            CRUMB_HEADER=(--header "$CRUMB_FIELD: $CRUMB_VALUE")
+          fi
+
+          while IFS= read -r MODULE; do
+            if [[ "$MODULE" == "platform-security" ]]; then
+              continue
+            fi
+
+            echo "Triggering Jenkins deployment for $MODULE"
+            curl --fail --silent --show-error \
+              --request POST \
+              --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
+              "${CRUMB_HEADER[@]}" \
+              --data-urlencode "token=$JENKINS_JOB_TOKEN" \
+              --data-urlencode "TARGET_ENV=test" \
+              "$JENKINS_BASE_URL/job/$MODULE/buildWithParameters"
+          done < <(jq -r '.[]' <<< "$CHANGED_MODULES")

@@ -85,7 +85,7 @@ public class AuthApplication {
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
-    return http.csrf(c -> c.disable())
+    return http.csrf(c -> c.ignoringRequestMatchers("/api/**", "/internal/**"))
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(h -> SecurityJsonHandlers.configure(h, mapper))
         .authorizeHttpRequests(

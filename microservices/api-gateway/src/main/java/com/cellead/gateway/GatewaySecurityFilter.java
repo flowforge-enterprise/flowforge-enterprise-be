@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
@@ -72,17 +73,13 @@ final class GatewaySecurityFilter implements GlobalFilter, Ordered {
     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
     exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
     try {
-      byte[] bytes =
-          mapper.writeValueAsBytes(
-              Map.of(
-                  "error",
-                  "UNAUTHORIZED",
-                  "message",
-                  message,
-                  "timestamp",
-                  Instant.now().toString(),
-                  "correlationId",
-                  exchange.getResponse().getHeaders().getFirst("X-Correlation-ID")));
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("error", "UNAUTHORIZED");
+      body.put("message", message);
+      body.put("timestamp", Instant.now().toString());
+      body.put(
+          "correlationId", exchange.getResponse().getHeaders().getFirst("X-Correlation-ID"));
+      byte[] bytes = mapper.writeValueAsBytes(body);
       DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
       return exchange.getResponse().writeWith(Mono.just(buffer));
     } catch (Exception ex) {
