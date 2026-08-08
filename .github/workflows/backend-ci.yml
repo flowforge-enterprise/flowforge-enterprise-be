@@ -36,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       modules: ${{ steps.detect.outputs.modules }}
-      sonar_modules: ${{ steps.detect.outputs.sonar_modules }}
       has_changes: ${{ steps.detect.outputs.has_changes }}
       run_compose_checks: ${{ steps.detect.outputs.run_compose_checks }}
       run_iac_checks: ${{ steps.detect.outputs.run_iac_checks }}
@@ -59,6 +58,7 @@ jobs:
             ai-assistant-service
             attachment-service
             api-gateway
+            platform-security
           )
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -75,7 +75,6 @@ jobs:
           cat /tmp/changed-files.txt
 
           declare -A SELECTED=()
-          declare -A SONAR_SELECTED=()
           COMMON_CHANGED=false
           SECURITY_CHANGED=false
           COMPOSE_CHANGED=false
@@ -100,7 +99,6 @@ jobs:
             for SERVICE in "${SERVICES[@]}"; do
               if [[ "$FILE_PATH" == "microservices/$SERVICE/"* ]]; then
                 SELECTED["$SERVICE"]=1
-                SONAR_SELECTED["$SERVICE"]=1
               fi
             done
           done < /tmp/changed-files.txt
@@ -108,16 +106,12 @@ jobs:
           if [ "$COMMON_CHANGED" = true ]; then
             for SERVICE in "${SERVICES[@]}"; do
               SELECTED["$SERVICE"]=1
-              SONAR_SELECTED["$SERVICE"]=1
             done
-            SONAR_SELECTED["platform-security"]=1
           fi
 
           if [ "$SECURITY_CHANGED" = true ]; then
-            SONAR_SELECTED["platform-security"]=1
             for SERVICE in auth-service workflow-service notification-audit-service ai-assistant-service attachment-service; do
               SELECTED["$SERVICE"]=1
-              SONAR_SELECTED["$SERVICE"]=1
             done
           fi
 
@@ -140,20 +134,6 @@ jobs:
             echo "modules=$JSON" >> "$GITHUB_OUTPUT"
             echo 'has_changes=true' >> "$GITHUB_OUTPUT"
           fi
-
-          SONAR_MODULES=()
-          for MODULE in platform-security "${SERVICES[@]}"; do
-            if [ "${SONAR_SELECTED[$MODULE]+set}" = "set" ]; then
-              SONAR_MODULES+=("$MODULE")
-            fi
-          done
-
-          SONAR_JSON="["
-          for MODULE in "${SONAR_MODULES[@]}"; do
-            SONAR_JSON="${SONAR_JSON}\"${MODULE}\","
-          done
-          SONAR_JSON="${SONAR_JSON%,}]"
-          echo "sonar_modules=$SONAR_JSON" >> "$GITHUB_OUTPUT"
 
           if [ "$COMPOSE_CHANGED" = true ] || [ "$COMMON_CHANGED" = true ]; then
             echo 'run_compose_checks=true' >> "$GITHUB_OUTPUT"
@@ -193,12 +173,14 @@ jobs:
   integration-container-evidence:
     name: Integration Test & Container Evidence
     runs-on: ubuntu-latest
-    needs: [detect-changes, trivy-image-scan]
+    needs: [detect-changes, trivy-image-scan, validate-compose]
     if: |
       always() &&
       needs.detect-changes.outputs.has_changes == 'true' &&
       needs.trivy-image-scan.result != 'failure' &&
-      needs.trivy-image-scan.result != 'cancelled'
+      needs.trivy-image-scan.result != 'cancelled' &&
+      needs.validate-compose.result != 'failure' &&
+      needs.validate-compose.result != 'cancelled'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -346,6 +328,8 @@ jobs:
       - name: Install Checkov
         run: python3 -m pip install --user checkov
 
+      # Checkov is evidence-only for now; remove --soft-fail / || true later
+      # if you want IaC policy violations to block the pipeline.
       - name: Run Checkov IaC scan
         run: |
           mkdir -p evidence/iac
@@ -442,7 +426,7 @@ jobs:
           cache-dependency-path: microservices/pom.xml
 
       - name: Run Checkstyle for selected service
-        run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am checkstyle:checkstyle || true
+        run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am checkstyle:check
 
       - name: Upload Checkstyle report
         if: always()
@@ -452,15 +436,19 @@ jobs:
           path: microservices/${{ matrix.module }}/target/site/checkstyle.html
 
   snyk-sca:
-    name: Snyk SCA Scan
+    name: Snyk SCA Scan (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.detect-changes.outputs.modules) }}
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     defaults:
       run:
-        working-directory: microservices
+        working-directory: microservices/${{ matrix.module }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -473,20 +461,23 @@ jobs:
       - name: Install Snyk CLI
         run: npm install -g snyk
 
-      - name: Run Snyk SCA scan
-        run: snyk test --all-projects --severity-threshold=high
-        continue-on-error: true
+      - name: Run Snyk SCA scan for selected service
+        run: snyk test --file=pom.xml --severity-threshold=high
 
   snyk-sast:
-    name: Snyk SAST Scan
+    name: Snyk SAST Scan (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.detect-changes.outputs.modules) }}
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     defaults:
       run:
-        working-directory: microservices
+        working-directory: microservices/${{ matrix.module }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -499,22 +490,17 @@ jobs:
       - name: Install Snyk CLI
         run: npm install -g snyk
 
-      - name: Run Snyk Code scan
+      - name: Run Snyk Code scan for selected service
         run: snyk code test --severity-threshold=high
-
-      - name: Monitor project in Snyk
-        run: snyk monitor --all-projects
 
   trivy-image-scan:
     name: Container Image Security Scan (Trivy) (${{ matrix.module }})
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-test, validate-compose]
+    needs: [detect-changes, build-test]
     if: |
       always() &&
       needs.detect-changes.outputs.has_changes == 'true' &&
-      needs.build-test.result == 'success' &&
-      needs.validate-compose.result != 'failure' &&
-      needs.validate-compose.result != 'cancelled'
+      needs.build-test.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -534,7 +520,7 @@ jobs:
             -t "flowforge/${{ matrix.module }}:${{ github.sha }}" \
             .
 
-      - name: Run Trivy vulnerability scan
+      - name: Run Trivy vulnerability scan (evidence)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "flowforge/${{ matrix.module }}:${{ github.sha }}"
@@ -544,6 +530,16 @@ jobs:
           vuln-type: "os,library"
           ignore-unfixed: true
           exit-code: "0"
+
+      - name: Enforce Trivy HIGH/CRITICAL security gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: "flowforge/${{ matrix.module }}:${{ github.sha }}"
+          format: "table"
+          severity: "HIGH,CRITICAL"
+          vuln-type: "os,library"
+          ignore-unfixed: true
+          exit-code: "1"
 
       - name: Upload Trivy image scan report
         if: always()
@@ -558,11 +554,11 @@ jobs:
     name: SonarQube Scan (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.sonar_modules != '[]'
+    if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
       fail-fast: false
       matrix:
-        module: ${{ fromJson(needs.detect-changes.outputs.sonar_modules) }}
+        module: ${{ fromJson(needs.detect-changes.outputs.modules) }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     defaults:
@@ -582,23 +578,55 @@ jobs:
           cache: maven
           cache-dependency-path: microservices/pom.xml
 
-      - name: Build and test selected module
+      - name: Resolve SonarQube project key
+        id: sonar-key
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${{ matrix.module }}" in
+            auth-service)
+              PROJECT_KEY="flowforge-enterprise-auth-service"
+              ;;
+            workflow-service)
+              PROJECT_KEY="flowforge-enterprise-workflow-service"
+              ;;
+            notification-audit-service)
+              PROJECT_KEY="flowforge-enterprise-notification-audit-service"
+              ;;
+            ai-assistant-service)
+              PROJECT_KEY="flowforge-enterprise-ai-assistant-service"
+              ;;
+            attachment-service)
+              PROJECT_KEY="flowforge-enterprise-attachment-service"
+              ;;
+            api-gateway)
+              PROJECT_KEY="flowforge-enterprise-api-gateway"
+              ;;
+            platform-security)
+              PROJECT_KEY="flowforge-enterprise-platform-security"
+              ;;
+            *)
+              echo "No SonarQube project key configured for ${{ matrix.module }}."
+              exit 1
+              ;;
+          esac
+
+          echo "project_key=$PROJECT_KEY" >> "$GITHUB_OUTPUT"
+          echo "SonarQube project: $PROJECT_KEY"
+
+      - name: Run SonarQube scan for selected service
         run: |
           mvn --batch-mode -ntp \
             -pl "${{ matrix.module }}" -am \
-            clean install
-
-      - name: Run SonarQube scan for selected module
-        run: |
-          mvn --batch-mode -ntp \
-            -f "${{ matrix.module }}/pom.xml" \
-            sonar:sonar \
-            -Dsonar.projectKey="flowforge-enterprise-${{ matrix.module }}" \
-            -Dsonar.projectName="FlowForge ${{ matrix.module }}" \
+            clean verify sonar:sonar \
+            -Dsonar.projectKey="${{ steps.sonar-key.outputs.project_key }}" \
             -Dsonar.organization=flowforge-enterprise \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.token="$SONAR_TOKEN" \
-            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.qualitygate.wait=true \
+            -Dsonar.qualitygate.timeout=300 \
+            -Dsonar.coverage.jacoco.xmlReportPaths="**/target/site/jacoco/jacoco.xml"
 
   dast-scan:
     name: Deploy Test Environment & DAST (OWASP ZAP)
@@ -656,6 +684,7 @@ jobs:
           10105	WARN
           EOF
 
+      # ZAP is evidence-only for now (continue-on-error + fail_action=false).
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
