@@ -7,6 +7,7 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
+// API gateway entry point for CI smoke validation.
 public class ApiGatewayApplication {
   public static void main(String[] args) {
     SpringApplication.run(ApiGatewayApplication.class, args);
