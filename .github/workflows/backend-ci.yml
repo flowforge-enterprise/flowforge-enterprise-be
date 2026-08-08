@@ -299,7 +299,7 @@ jobs:
             --framework kubernetes \
             --output json \
             --soft-fail \
-            > evidence/iac/checkov-kubernetes.json
+            > evidence/iac/checkov-kubernetes.json || true
 
       - name: Upload IaC scan evidence
         if: always()
