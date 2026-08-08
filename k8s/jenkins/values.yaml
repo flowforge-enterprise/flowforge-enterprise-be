@@ -1,0 +1,68 @@
+controller:
+  image:
+    registry: docker.m.daocloud.io
+    repository: jenkins/jenkins
+    tag: 2.555.1-jdk21
+    pullPolicy: IfNotPresent
+
+  nodeSelector:
+    workload: jenkins
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+  initContainerEnv:
+    - name: JENKINS_UC
+      value: https://updates.jenkins.io/update-center.json
+    - name: JENKINS_UC_DOWNLOAD
+      value: https://mirrors.tuna.tsinghua.edu.cn/jenkins
+
+  # Temporary public endpoint for GitHub webhooks. Prefer HTTPS Ingress for production.
+  serviceType: LoadBalancer
+  jenkinsUrl: http://115.29.194.246:8080
+
+  # Jenkins Controller 不执行普通构建任务
+  numExecutors: 0
+
+  JCasC:
+    defaultConfig: true
+
+  additionalPlugins:
+    - github:1.47.0
+
+  sidecars:
+    configAutoReload:
+      image:
+        registry: docker.m.daocloud.io
+        repository: kiwigrid/k8s-sidecar
+        tag: 2.8.1
+
+persistence:
+  enabled: true
+  existingClaim: jenkins-pvc
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: false
+  name: jenkins
+
+agent:
+  enabled: true
+  image:
+    registry: docker.m.daocloud.io
+    repository: jenkins/inbound-agent
+    tag: 3384.v60d89463d9e0-1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"

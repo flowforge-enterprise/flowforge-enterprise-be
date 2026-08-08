@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../mysql.yaml
+  - ../microservices/auth-service.yaml
+  - ../microservices/workflow-service.yaml
+  - ../microservices/notification-audit-service.yaml
+  - ../microservices/ai-assistant-service.yaml
+  - ../microservices/attachment-service.yaml
+  - ../microservices/api-gateway.yaml
+

@@ -1,152 +1,198 @@
+def services = [
+    'auth-service',
+    'workflow-service',
+    'notification-audit-service',
+    'ai-assistant-service',
+    'attachment-service',
+    'api-gateway'
+]
+
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            defaultContainer 'maven'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  containers:
+    - name: jnlp
+      image: docker.m.daocloud.io/jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+    - name: maven
+      image: docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17
+      command: ["sleep"]
+      args: ["99d"]
+      tty: true
+      resources:
+        requests: {cpu: 500m, memory: 1Gi}
+        limits: {cpu: "2", memory: 3Gi}
+    - name: kaniko
+      image: registry.cn-hangzhou.aliyuncs.com/kube-image-repo/kaniko:v1.9.1-debug
+      command: ["/busybox/cat"]
+      tty: true
+      resources:
+        requests: {cpu: 500m, memory: 1Gi}
+        limits: {cpu: "2", memory: 3Gi}
+    - name: kubectl
+      image: docker.m.daocloud.io/alpine/k8s:1.36.1
+      command: ["sleep"]
+      args: ["99d"]
+      tty: true
+      resources:
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+'''
+        }
+    }
+
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
+        timestamps()
+        timeout(time: 45, unit: 'MINUTES')
+        skipDefaultCheckout(true)
+    }
+
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['test', 'prod'],
+            description: 'Deploy target environment. test -> flowforge-test, prod -> flowforge-prod.'
+        )
+    }
 
     environment {
-        KUBECONFIG = '/var/jenkins_home/.kube/config'
-
-        K8S_NAMESPACE    = 'flowforge'
-        ACR_REGISTRY     = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
-        ACR_NAMESPACE    = 'nus_flowforge'
-
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
+        IMAGE_REPOSITORY = 'nus_flowforge/flowforge-enterprise-be'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout and resolve service') {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Check Tools') {
-            steps {
-                sh '''
-                echo "===== Check docker ====="
-                docker version
-
-                echo "===== Check kubectl ====="
-                kubectl version --client
-
-                echo "===== Check ACK nodes ====="
-                kubectl get nodes
-                '''
-            }
-        }
-
-        stage('Build & Push Images') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'acr-credential',
-                    usernameVariable: 'ACR_USERNAME',
-                    passwordVariable: 'ACR_PASSWORD'
-                )]) {
-                    sh '''
-                    echo "===== Login to ACR ====="
-                    echo "$ACR_PASSWORD" | docker login $ACR_REGISTRY -u "$ACR_USERNAME" --password-stdin
-                    '''
+                retry(3) {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/master']],
+                        userRemoteConfigs: [[url: 'https://github.com/flowforge-enterprise/flowforge-enterprise-be.git']]
+                    ])
                 }
-
+                sh 'git config --global --add safe.directory "$WORKSPACE"'
                 script {
-                    def services = [
-                        'auth-service',
-                        'workflow-service',
-                        'notification-audit-service',
-                        'ai-assistant-service',
-                        'attachment-service',
-                        'api-gateway'
-                    ]
+                    def matches = services.findAll { env.JOB_BASE_NAME == it || env.JOB_BASE_NAME.endsWith("-${it}") }
+                    if (matches.size() != 1) {
+                        error("Job 名必须是服务名或以服务名结尾。允许值: ${services.join(', ')}")
+                    }
+                    env.SERVICE_NAME = matches[0]
+                    env.TARGET_ENV = params.TARGET_ENV ?: 'test'
+                    if (!(env.TARGET_ENV in ['test', 'prod'])) {
+                        error("TARGET_ENV 只能是 test 或 prod，当前值: ${env.TARGET_ENV}")
+                    }
+                    env.K8S_NAMESPACE = "flowforge-${env.TARGET_ENV}"
+                    env.SHORT_COMMIT = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
+                    env.IMAGE_TAG = "${env.TARGET_ENV}-${BUILD_NUMBER}-${env.SHORT_COMMIT}"
+                    echo "Target environment: ${env.TARGET_ENV}; namespace: ${env.K8S_NAMESPACE}; image tag: ${env.SERVICE_NAME}-${env.IMAGE_TAG}"
+                }
+            }
+        }
 
-                    for (svc in services) {
-                        def imageName   = "${ACR_REGISTRY}/${ACR_NAMESPACE}/${svc}:${IMAGE_TAG}"
-                        def imageLatest = "${ACR_REGISTRY}/${ACR_NAMESPACE}/${svc}:latest"
+        stage('Detect changes') {
+            steps {
+                script {
+                    def base = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT?.trim()
+                    if (!base || sh(script: "git cat-file -e '${base}^{commit}' 2>/dev/null", returnStatus: true) != 0) {
+                        base = sh(script: 'git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD', returnStdout: true).trim()
+                    }
+                    def changed = sh(script: "git diff --name-only '${base}' HEAD", returnStdout: true).trim().readLines()
+                    def commonChanged = changed.any {
+                        it in ['microservices/pom.xml', 'microservices/Dockerfile', 'Jenkinsfile']
+                    }
+                    def securityChanged = changed.any { it.startsWith('microservices/platform-security/') }
+                    def usesSecurity = env.SERVICE_NAME != 'api-gateway'
+                    def serviceChanged = changed.any { it.startsWith("microservices/${env.SERVICE_NAME}/") }
+                    env.SHOULD_BUILD = (commonChanged || serviceChanged || (securityChanged && usesSecurity)).toString()
+                    echo "Service: ${env.SERVICE_NAME}; changed files: ${changed.size()}; build: ${env.SHOULD_BUILD}"
+                }
+            }
+        }
 
-                        sh """
-                        echo "===== Build ${svc} ====="
-                        docker build \
-                          --build-arg MODULE=${svc} \
-                          -t ${imageName} \
-                          -f microservices/Dockerfile \
-                          microservices/
+        stage('Test') {
+            when { expression { env.SHOULD_BUILD == 'true' } }
+            steps {
+                sh 'mvn -B -ntp -f microservices/pom.xml -pl "$SERVICE_NAME" -am clean verify'
+            }
+        }
 
-                        docker tag ${imageName} ${imageLatest}
-
-                        echo "===== Push ${svc} ====="
-                        docker push ${imageName}
-                        docker push ${imageLatest}
-                        """
+        stage('Build and push image') {
+            when { expression { env.SHOULD_BUILD == 'true' } }
+            steps {
+                container('kaniko') {
+                    withCredentials([usernamePassword(credentialsId: 'acr-credential', usernameVariable: 'ACR_USERNAME', passwordVariable: 'ACR_PASSWORD')]) {
+                        sh '''
+                            set -eu
+                            mkdir -p /kaniko/.docker
+                            AUTH="$(printf '%s:%s' "$ACR_USERNAME" "$ACR_PASSWORD" | base64 | tr -d '\n')"
+                            printf '{"auths":{"%s":{"auth":"%s"}}}' "$ACR_REGISTRY" "$AUTH" > /kaniko/.docker/config.json
+                            /kaniko/executor \
+                              --context "$WORKSPACE/microservices" \
+                              --dockerfile "$WORKSPACE/microservices/Dockerfile" \
+                              --build-arg "MODULE=$SERVICE_NAME" \
+                              --destination "$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
+                              --snapshot-mode=redo \
+                              --use-new-run
+                        '''
                     }
                 }
             }
         }
 
         stage('Deploy to ACK') {
+            when { expression { env.SHOULD_BUILD == 'true' } }
             steps {
-                sh '''
-                echo "===== Apply namespace ====="
-                kubectl apply -f k8s/namespace.yaml
+                container('kubectl') {
+                    withCredentials([usernamePassword(credentialsId: 'acr-credential', usernameVariable: 'ACR_USERNAME', passwordVariable: 'ACR_PASSWORD')]) {
+                        sh '''
+                        set -eu
 
-                echo "===== Apply infrastructure (MySQL, etc.) ====="
-                kubectl apply -f k8s/mysql.yaml
-                '''
+                        if [ "$TARGET_ENV" = "prod" ]; then
+                          echo "Deploying to production namespace: $K8S_NAMESPACE"
+                        else
+                          echo "Deploying to test namespace: $K8S_NAMESPACE"
+                        fi
 
-                script {
-                    def services = [
-                        'auth-service',
-                        'workflow-service',
-                        'notification-audit-service',
-                        'ai-assistant-service',
-                        'attachment-service',
-                        'api-gateway'
-                    ]
+                        kubectl apply -f "k8s/overlays/$TARGET_ENV/namespace.yaml"
 
-                    for (svc in services) {
-                        def imageName = "${ACR_REGISTRY}/${ACR_NAMESPACE}/${svc}:${IMAGE_TAG}"
+                        kubectl create secret docker-registry acr-secret \
+                          --docker-server="$ACR_REGISTRY" \
+                          --docker-username="$ACR_USERNAME" \
+                          --docker-password="$ACR_PASSWORD" \
+                          --namespace "$K8S_NAMESPACE" \
+                          --dry-run=client -o yaml | kubectl apply -f -
 
-                        sh """
-                        echo "===== Deploy ${svc} ====="
-                        kubectl apply -f k8s/microservices/${svc}.yaml -n ${K8S_NAMESPACE}
+                        if ! kubectl get secret flowforge-shared-secret --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+                          echo "ERROR: Missing required secret flowforge-shared-secret in namespace $K8S_NAMESPACE"
+                          echo "Create it before deploying:"
+                          echo "kubectl -n $K8S_NAMESPACE create secret generic flowforge-shared-secret --from-literal=APP_JWT_SECRET=... --from-literal=INTERNAL_API_KEY=... --from-literal=DEFAULT_PASSWORD=..."
+                          exit 1
+                        fi
 
-                        kubectl set image deployment/${svc} \
-                          ${svc}=${imageName} \
-                          -n ${K8S_NAMESPACE}
+                        kubectl kustomize --load-restrictor=LoadRestrictionsNone "k8s/overlays/$TARGET_ENV" | kubectl apply -f -
 
-                        kubectl rollout status deployment/${svc} \
-                          -n ${K8S_NAMESPACE} \
-                          --timeout=180s
-                        """
+                        kubectl set image "deployment/$SERVICE_NAME" \
+                          "$SERVICE_NAME=$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
+                          --namespace "$K8S_NAMESPACE"
+                        kubectl rollout status "deployment/$SERVICE_NAME" \
+                          --namespace "$K8S_NAMESPACE" --timeout=5m
+                    '''
                     }
                 }
-            }
-        }
-
-        stage('Verify ACK Resources') {
-            steps {
-                sh '''
-                echo "===== Pods ====="
-                kubectl get pods -n $K8S_NAMESPACE
-
-                echo "===== Services ====="
-                kubectl get svc -n $K8S_NAMESPACE
-
-                echo "===== PVC ====="
-                kubectl get pvc -n $K8S_NAMESPACE || true
-
-                echo "===== Service logs (last 50 lines each) ====="
-                for svc in auth-service workflow-service notification-audit-service ai-assistant-service attachment-service api-gateway; do
-                  echo "--- $svc ---"
-                  kubectl logs -n $K8S_NAMESPACE deployment/$svc --tail=50 || true
-                done
-                '''
             }
         }
     }
 
     post {
-        failure {
-            echo 'Pipeline failed. Check the logs above for details.'
-        }
-        success {
-            echo "All microservices deployed successfully at build #${BUILD_NUMBER}."
-        }
+        success { echo "${env.SERVICE_NAME ?: 'service'} pipeline completed." }
+        failure { echo 'Pipeline failed. Review the failed stage and Kubernetes events.' }
     }
 }
