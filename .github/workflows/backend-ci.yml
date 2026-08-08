@@ -149,8 +149,12 @@ jobs:
   validate-compose:
     name: Validate Docker Compose
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.run_compose_checks == 'true'
+    needs: [detect-changes, build-test]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.run_compose_checks == 'true' &&
+      needs.build-test.result != 'failure' &&
+      needs.build-test.result != 'cancelled'
     defaults:
       run:
         working-directory: microservices
@@ -168,8 +172,12 @@ jobs:
   integration-container-evidence:
     name: Integration Test & Container Evidence
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    needs: [detect-changes, trivy-image-scan]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.trivy-image-scan.result != 'failure' &&
+      needs.trivy-image-scan.result != 'cancelled'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -341,8 +349,20 @@ jobs:
   build-test:
     name: Build & Test (${{ matrix.module }})
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    needs: [detect-changes, lint-check, sonar, snyk-sca, snyk-sast, iac-scan]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.lint-check.result != 'failure' &&
+      needs.lint-check.result != 'cancelled' &&
+      needs.sonar.result != 'failure' &&
+      needs.sonar.result != 'cancelled' &&
+      needs.snyk-sca.result != 'failure' &&
+      needs.snyk-sca.result != 'cancelled' &&
+      needs.snyk-sast.result != 'failure' &&
+      needs.snyk-sast.result != 'cancelled' &&
+      needs.iac-scan.result != 'failure' &&
+      needs.iac-scan.result != 'cancelled'
     strategy:
       fail-fast: false
       matrix:
@@ -467,8 +487,13 @@ jobs:
   trivy-image-scan:
     name: Container Image Security Scan (Trivy) (${{ matrix.module }})
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-test]
-    if: needs.detect-changes.outputs.has_changes == 'true'
+    needs: [detect-changes, build-test, validate-compose]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.build-test.result == 'success' &&
+      needs.validate-compose.result != 'failure' &&
+      needs.validate-compose.result != 'cancelled'
     strategy:
       fail-fast: false
       matrix:
@@ -511,7 +536,7 @@ jobs:
   sonar:
     name: SonarQube Scan
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-test]
+    needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -534,7 +559,7 @@ jobs:
 
       - name: Run SonarQube scan
         run: |
-          mvn --batch-mode -ntp sonar:sonar \
+          mvn --batch-mode -ntp clean verify sonar:sonar \
             -Dsonar.projectKey=flowforge-enterprise-be \
             -Dsonar.organization=flowforge-enterprise \
             -Dsonar.host.url=https://sonarcloud.io \
@@ -542,12 +567,17 @@ jobs:
             -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
 
   dast-scan:
-    name: DAST Security Scan (OWASP ZAP)
+    name: Deploy Test Environment & DAST (OWASP ZAP)
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-test]
+    needs: [detect-changes, integration-container-evidence]
     if: |
-      (github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_dast == 'true')
+      always() &&
+      needs.integration-container-evidence.result != 'failure' &&
+      needs.integration-container-evidence.result != 'cancelled' &&
+      (
+        (github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_dast == 'true')
+      )
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -634,7 +664,13 @@ jobs:
   stress-test:
     name: Stress Test with k6
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.run_stress == 'true'
+    needs: [detect-changes, dast-scan]
+    if: |
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_stress == 'true' &&
+      needs.dast-scan.result != 'failure' &&
+      needs.dast-scan.result != 'cancelled'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -742,7 +778,7 @@ jobs:
             "snyk-sast": "Snyk code security scan",
             "trivy-image-scan": "Trivy container image security scan",
             "sonar": "SonarQube quality analysis",
-            "dast-scan": "OWASP ZAP DAST scan",
+            "dast-scan": "Test environment deployment and OWASP ZAP DAST scan",
             "stress-test": "k6 stress test",
           }
 
