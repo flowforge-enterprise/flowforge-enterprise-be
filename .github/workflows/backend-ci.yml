@@ -641,10 +641,12 @@ jobs:
     needs: [detect-changes, integration-container-evidence]
     if: |
       always() &&
-      github.event_name == 'push' &&
-      needs.detect-changes.outputs.has_changes == 'true' &&
       needs.integration-container-evidence.result != 'failure' &&
-      needs.integration-container-evidence.result != 'cancelled'
+      needs.integration-container-evidence.result != 'cancelled' &&
+      (
+        (github.event_name == 'push' && needs.detect-changes.outputs.has_changes == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_stress == 'true')
+      )
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
