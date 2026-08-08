@@ -66,6 +66,7 @@ spec:
     environment {
         ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
         IMAGE_REPOSITORY = 'nus_flowforge/flowforge-enterprise-be'
+        GITHUB_CREDENTIAL_ID = 'github-credential'
     }
 
     stages {
@@ -147,6 +148,48 @@ spec:
             }
         }
 
+        stage('Record deployment manifest') {
+            when { expression { env.SHOULD_BUILD == 'true' } }
+            steps {
+                container('kubectl') {
+                    withCredentials([gitUsernamePassword(
+                        credentialsId: env.GITHUB_CREDENTIAL_ID,
+                        gitToolName: 'Default'
+                    )]) {
+                        retry(3) {
+                            sh '''
+                                set -eu
+
+                                SOURCE_IMAGE="$ACR_REGISTRY/nus_flowforge/$SERVICE_NAME"
+                                IMAGE_REFERENCE="$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG"
+                                OVERLAY_DIR="k8s/overlays/$TARGET_ENV"
+
+                                git fetch origin master
+                                git checkout -B deployment-manifest origin/master
+                                (
+                                  cd "$OVERLAY_DIR"
+                                  kustomize edit set image "$SOURCE_IMAGE=$IMAGE_REFERENCE"
+                                )
+
+                                git config user.name "Jenkins"
+                                git config user.email "jenkins@flowforge.local"
+                                git add "$OVERLAY_DIR/kustomization.yaml"
+
+                                if git diff --cached --quiet; then
+                                  echo "Deployment manifest already references $IMAGE_REFERENCE"
+                                  exit 0
+                                fi
+
+                                git commit -m "chore(deploy): update $SERVICE_NAME $TARGET_ENV image"
+                                git pull --rebase origin master
+                                git push origin HEAD:master
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Deploy to ACK') {
             when { expression { env.SHOULD_BUILD == 'true' } }
             steps {
@@ -178,10 +221,6 @@ spec:
                         fi
 
                         kubectl kustomize --load-restrictor=LoadRestrictionsNone "k8s/overlays/$TARGET_ENV" | kubectl apply -f -
-
-                        kubectl set image "deployment/$SERVICE_NAME" \
-                          "$SERVICE_NAME=$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
-                          --namespace "$K8S_NAMESPACE"
                         kubectl rollout status "deployment/$SERVICE_NAME" \
                           --namespace "$K8S_NAMESPACE" --timeout=5m
                     '''
