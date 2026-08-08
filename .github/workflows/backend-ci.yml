@@ -198,13 +198,21 @@ jobs:
             echo
           } > evidence/integration/smoke-test.md
 
-          check_http() {
+          curl_code() {
+            local url="$1"
+            local body_path="$2"
+            local code
+            code="$(curl -s -o "$body_path" -w "%{http_code}" "$url" 2>/dev/null || true)"
+            printf "%s" "${code:-000}"
+          }
+
+          check_http_once() {
             local name="$1"
             local url="$2"
             local expected_codes="$3"
             local code
 
-            code="$(curl -s -o "evidence/integration/${name}.body" -w "%{http_code}" "$url" || echo "000")"
+            code="$(curl_code "$url" "evidence/integration/${name}.body")"
             echo "| ${name} | ${url} | ${code} | ${expected_codes} |" >> evidence/integration/smoke-test.md
             if [[ ",${expected_codes}," != *",${code},"* ]]; then
               echo "Unexpected HTTP code for ${name}: ${code}; expected one of ${expected_codes}" >&2
@@ -212,16 +220,34 @@ jobs:
             fi
           }
 
-          for i in {1..36}; do
-            code="$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GATEWAY_PORT}/actuator/health" || echo "000")"
-            echo "[$i/36] api-gateway /actuator/health HTTP_CODE=$code"
+          wait_http() {
+            local name="$1"
+            local url="$2"
+            local expected_codes="$3"
+            local code
+
+            for i in {1..48}; do
+              code="$(curl_code "$url" "evidence/integration/${name}.body")"
+              echo "[$i/48] ${name} HTTP_CODE=$code"
+              if [[ ",${expected_codes}," == *",${code},"* ]]; then
+                echo "| ${name} | ${url} | ${code} | ${expected_codes} |" >> evidence/integration/smoke-test.md
+                return 0
+              fi
+              sleep 5
+            done
+
+            echo "| ${name} | ${url} | ${code} | ${expected_codes} |" >> evidence/integration/smoke-test.md
+            echo "Unexpected HTTP code for ${name}: ${code}; expected one of ${expected_codes}" >&2
+            docker compose -f microservices/docker-compose.yml ps
+            docker compose -f microservices/docker-compose.yml logs --tail=120
+            return 1
+          }
+
+          for i in {1..48}; do
+            code="$(curl_code "http://localhost:${GATEWAY_PORT}/actuator/health" /tmp/api-gateway-health.body)"
+            echo "[$i/48] api-gateway /actuator/health HTTP_CODE=$code"
             if [ "$code" = "200" ]; then
               break
-            fi
-            if [ "$i" = "36" ]; then
-              docker compose -f microservices/docker-compose.yml ps
-              docker compose -f microservices/docker-compose.yml logs --tail=120
-              exit 1
             fi
             sleep 5
           done
@@ -231,12 +257,12 @@ jobs:
             echo "|---|---|---:|---|"
           } >> evidence/integration/smoke-test.md
 
-          check_http "api-gateway-health" "http://localhost:${GATEWAY_PORT}/actuator/health" "200"
-          check_http "auth-health" "http://localhost:8081/actuator/health" "200"
-          check_http "workflow-health" "http://localhost:8082/actuator/health" "200"
-          check_http "notification-health" "http://localhost:8083/actuator/health" "200"
-          check_http "ai-assistant-health" "http://localhost:8084/actuator/health" "200"
-          check_http "attachment-health" "http://localhost:8085/actuator/health" "200"
+          wait_http "api-gateway-health" "http://localhost:${GATEWAY_PORT}/actuator/health" "200"
+          wait_http "auth-health" "http://localhost:8081/actuator/health" "200"
+          wait_http "workflow-health" "http://localhost:8082/actuator/health" "200"
+          wait_http "notification-health" "http://localhost:8083/actuator/health" "200"
+          wait_http "ai-assistant-health" "http://localhost:8084/actuator/health" "200"
+          wait_http "attachment-health" "http://localhost:8085/actuator/health" "200"
 
       - name: Capture container inspection evidence
         if: always()
