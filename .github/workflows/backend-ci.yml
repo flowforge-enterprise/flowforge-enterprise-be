@@ -1144,9 +1144,12 @@ jobs:
           set -euo pipefail
 
           JENKINS_BASE_URL="${JENKINS_URL%/}"
+          COOKIE_JAR="$(mktemp)"
+          trap 'rm -f "$COOKIE_JAR"' EXIT
           CRUMB_HEADER=()
           if CRUMB_JSON=$(curl --fail --silent --show-error \
               --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
+              --cookie-jar "$COOKIE_JAR" \
               "$JENKINS_BASE_URL/crumbIssuer/api/json"); then
             CRUMB_FIELD=$(jq -r '.crumbRequestField' <<< "$CRUMB_JSON")
             CRUMB_VALUE=$(jq -r '.crumb' <<< "$CRUMB_JSON")
@@ -1162,6 +1165,7 @@ jobs:
             curl --fail --silent --show-error \
               --request POST \
               --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
+              --cookie "$COOKIE_JAR" \
               "${CRUMB_HEADER[@]}" \
               --data-urlencode "token=$JENKINS_JOB_TOKEN" \
               --data-urlencode "TARGET_ENV=test" \
