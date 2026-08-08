@@ -21,6 +21,7 @@
         <jackson-bom.version>2.21.5</jackson-bom.version>
         <logback.version>1.5.36</logback.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
+        <tomcat.version>10.1.56</tomcat.version>
     </properties>
     <modules>
         <module>platform-security</module>
