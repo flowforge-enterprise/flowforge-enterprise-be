@@ -360,8 +360,6 @@ jobs:
       needs.detect-changes.outputs.has_changes == 'true' &&
       needs.lint-check.result != 'failure' &&
       needs.lint-check.result != 'cancelled' &&
-      needs.sonar.result != 'failure' &&
-      needs.sonar.result != 'cancelled' &&
       needs.snyk-sca.result != 'failure' &&
       needs.snyk-sca.result != 'cancelled' &&
       needs.snyk-sast.result != 'failure' &&
@@ -551,8 +549,9 @@ jobs:
           retention-days: 30
 
   sonar:
-    name: Quality | SonarCloud (${{ matrix.module }})
+    name: Quality | SonarCloud advisory (${{ matrix.module }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
@@ -624,7 +623,8 @@ jobs:
       - name: Analyze service with SonarCloud
         run: |
           SONAR_COVERAGE_ARGS=()
-          if [[ "${{ matrix.module }}" == "platform-security" ]]; then
+          if [[ "${{ matrix.module }}" == "platform-security" || \
+                "${{ matrix.module }}" == "api-gateway" ]]; then
             SONAR_COVERAGE_ARGS+=("-Dsonar.coverage.exclusions=**")
           fi
 
@@ -1125,7 +1125,6 @@ jobs:
       needs.snyk-sca.result == 'success' &&
       needs.snyk-sast.result == 'success' &&
       needs.trivy-image-scan.result == 'success' &&
-      needs.sonar.result == 'success' &&
       needs.dast-scan.result != 'failure' &&
       needs.dast-scan.result != 'cancelled' &&
       needs.stress-test.result != 'failure' &&

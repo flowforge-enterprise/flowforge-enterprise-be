@@ -143,6 +143,11 @@ class AttachmentApplicationTest {
         .isInstanceOf(ResponseStatusException.class)
         .extracting(error -> ((ResponseStatusException) error).getStatusCode())
         .isEqualTo(HttpStatus.FORBIDDEN);
+    record.uploaderId = null;
+    assertThatThrownBy(() -> allowed.delete(11L, other))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(error -> ((ResponseStatusException) error).getStatusCode())
+        .isEqualTo(HttpStatus.FORBIDDEN);
     when(repository.findById(99L)).thenReturn(Optional.empty());
     assertThatThrownBy(() -> allowed.download(99L, other))
         .isInstanceOf(ResponseStatusException.class)

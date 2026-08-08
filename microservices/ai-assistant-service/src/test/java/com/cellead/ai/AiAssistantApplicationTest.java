@@ -39,6 +39,15 @@ class AiAssistantApplicationTest {
   void contextLoads() {}
 
   @Test
+  void csrfRemainsEnabledForRequestsWithoutBearerAuthentication() throws Exception {
+    mvc.perform(
+            post("/api/ai/form-assistant")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"input\":\"Cross-site request\"}"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void fallbackIsValidatedAndRoleProtected() throws Exception {
     String requester = jwt.generate(1L, "requester", "REQUESTER");
     mvc.perform(

@@ -19,6 +19,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -59,7 +60,16 @@ public class AiAssistantApplication {
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
-    return http.csrf(c -> c.ignoringRequestMatchers("/api/**"))
+    // Bearer tokens are supplied explicitly in the Authorization header and are never read from
+    // cookies, so browsers cannot attach them to cross-site requests. Keep CSRF protection enabled
+    // for every request that does not use bearer authentication.
+    return http.csrf(
+            c ->
+                c.ignoringRequestMatchers(
+                    request -> {
+                      String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+                      return authorization != null && authorization.startsWith("Bearer ");
+                    }))
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(h -> SecurityJsonHandlers.configure(h, mapper))
         .authorizeHttpRequests(
