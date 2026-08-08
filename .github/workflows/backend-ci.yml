@@ -831,6 +831,7 @@ jobs:
       JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
       JENKINS_JOB_TOKEN: ${{ secrets.JENKINS_JOB_TOKEN }}
       CHANGED_MODULES: ${{ needs.detect-changes.outputs.modules }}
+      TARGET_ENV: test
     steps:
       - name: Trigger deployments for affected services
         shell: bash
@@ -862,6 +863,6 @@ jobs:
               --cookie "$COOKIE_JAR" \
               "${CRUMB_HEADER[@]}" \
               --data-urlencode "token=$JENKINS_JOB_TOKEN" \
-              --data-urlencode "TARGET_ENV=test" \
-              "$JENKINS_BASE_URL/job/$MODULE/buildWithParameters"
+              --data-urlencode "TARGET_ENV=$TARGET_ENV" \
+              "$JENKINS_BASE_URL/job/$TARGET_ENV/job/$MODULE/buildWithParameters"
           done < <(jq -r '.[]' <<< "$CHANGED_MODULES")
