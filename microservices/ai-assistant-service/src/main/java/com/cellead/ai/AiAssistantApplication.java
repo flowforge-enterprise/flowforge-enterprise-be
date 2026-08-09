@@ -61,7 +61,6 @@ public class AiAssistantApplication {
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
     // Bearer tokens are supplied explicitly in the Authorization header and are never read from
-    // cookies, so browsers cannot attach them to cross-site requests. Keep CSRF protection enabled
     // for every request that does not use bearer authentication.
     return http.csrf(
             c ->
