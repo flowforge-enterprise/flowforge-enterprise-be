@@ -7,6 +7,11 @@ resources:
   - namespace.yaml
   - ../../base
 
+images:
+  - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/api-gateway
+    newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
+    newTag: api-gateway-test-14-b06b8aa92f74
+
 patches:
   - target:
       kind: Deployment
