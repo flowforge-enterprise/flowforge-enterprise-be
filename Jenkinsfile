@@ -33,6 +33,7 @@ spec:
         limits: {cpu: "2", memory: 3Gi}
     - name: kaniko
       image: registry.cn-hangzhou.aliyuncs.com/kube-image-repo/kaniko:v1.9.1-debug
+      workingDir: /home/jenkins/agent
       command: ["/busybox/cat"]
       tty: true
       resources:
@@ -143,6 +144,7 @@ spec:
                               --build-arg "MODULE=$SERVICE_NAME" \
                               --destination "$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
                               --cache=true \
+                              --cache-repo "$ACR_REGISTRY/$IMAGE_REPOSITORY" \
                               --cache-run-layers=true \
                               --cache-ttl=168h \
                               --snapshot-mode=redo \
