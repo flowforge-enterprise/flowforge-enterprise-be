@@ -13,7 +13,7 @@ images:
   newTag: ai-assistant-service-test-22-6fbfe2ccb5cf
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/api-gateway
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-  newTag: api-gateway-test-25-34d013fb85ce
+  newTag: api-gateway-test-28-17d4b6f04489
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/attachment-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
   newTag: attachment-service-test-20-6fbfe2ccb5cf
