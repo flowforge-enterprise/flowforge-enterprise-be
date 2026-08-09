@@ -65,7 +65,7 @@ spec:
     }
 
     options {
-        disableConcurrentBuilds(abortPrevious: true)
+        disableConcurrentBuilds()
         timestamps()
         timeout(time: 45, unit: 'MINUTES')
         skipDefaultCheckout(true)
@@ -202,7 +202,7 @@ spec:
                                   exit 0
                                 fi
 
-                                git commit -m "chore(deploy): update $SERVICE_NAME $TARGET_ENV image"
+                                git commit -m "chore(deploy): update $SERVICE_NAME $TARGET_ENV image [skip ci]"
                                 git pull --rebase origin master
                                 git push origin HEAD:master
                             '''
