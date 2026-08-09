@@ -18,6 +18,13 @@ spec:
   serviceAccountName: jenkins
   nodeSelector:
     workload: nonprod
+  initContainers:
+    - name: kaniko-tools
+      image: registry.cn-hangzhou.aliyuncs.com/kube-image-repo/kaniko:v1.9.1-debug
+      command: ["/busybox/sh", "-c", "cp -a /busybox/. /kaniko-tools/"]
+      volumeMounts:
+        - name: kaniko-tools
+          mountPath: /kaniko-tools
   containers:
     - name: jnlp
       image: docker.m.daocloud.io/jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
@@ -36,6 +43,9 @@ spec:
       workingDir: /home/jenkins/agent
       command: ["/busybox/cat"]
       tty: true
+      volumeMounts:
+        - name: kaniko-tools
+          mountPath: /busybox
       resources:
         requests: {cpu: 250m, memory: 512Mi}
         limits: {cpu: "2", memory: 3Gi}
@@ -47,6 +57,9 @@ spec:
       resources:
         requests: {cpu: 50m, memory: 128Mi}
         limits: {cpu: 500m, memory: 512Mi}
+  volumes:
+    - name: kaniko-tools
+      emptyDir: {}
 '''
         }
     }
