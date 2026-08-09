@@ -143,7 +143,6 @@ spec:
                               --build-arg "MODULE=$SERVICE_NAME" \
                               --destination "$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
                               --cache=true \
-                              --cache-copy-layers=true \
                               --cache-run-layers=true \
                               --cache-ttl=168h \
                               --snapshot-mode=redo \
