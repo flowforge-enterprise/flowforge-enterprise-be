@@ -4,26 +4,26 @@ kind: Kustomization
 namespace: flowforge-test
 
 resources:
-  - namespace.yaml
-  - ../../base
+- namespace.yaml
+- ../../base
 
 images:
-  - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/api-gateway
-    newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-    newTag: api-gateway-test-14-b06b8aa92f74
+- name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/api-gateway
+  newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
+  newTag: api-gateway-test-21-77fbbab4a312
 
 patches:
-  - target:
-      kind: Deployment
-    patch: |-
-      - op: add
-        path: /spec/template/spec/nodeSelector
-        value:
-          workload: nonprod
-  - target:
-      kind: StatefulSet
-    patch: |-
-      - op: add
-        path: /spec/template/spec/nodeSelector
-        value:
-          workload: nonprod
+- patch: |-
+    - op: add
+      path: /spec/template/spec/nodeSelector
+      value:
+        workload: nonprod
+  target:
+    kind: Deployment
+- patch: |-
+    - op: add
+      path: /spec/template/spec/nodeSelector
+      value:
+        workload: nonprod
+  target:
+    kind: StatefulSet
