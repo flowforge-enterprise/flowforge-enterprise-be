@@ -180,6 +180,8 @@ spec:
                             sh '''
                                 set -eu
 
+                                git config --global --add safe.directory "$WORKSPACE"
+
                                 SOURCE_IMAGE="$ACR_REGISTRY/nus_flowforge/$SERVICE_NAME"
                                 IMAGE_REFERENCE="$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG"
                                 OVERLAY_DIR="k8s/overlays/$TARGET_ENV"
