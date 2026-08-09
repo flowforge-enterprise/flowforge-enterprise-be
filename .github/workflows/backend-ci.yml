@@ -76,7 +76,7 @@ jobs:
 
           while IFS= read -r FILE_PATH; do
             case "$FILE_PATH" in
-              microservices/pom.xml|microservices/Dockerfile|.github/workflows/backend-ci.yml)
+              microservices/pom.xml|microservices/Dockerfile|Jenkinsfile|.github/workflows/backend-ci.yml)
                 COMMON_CHANGED=true
                 ;;
               microservices/platform-security/*)

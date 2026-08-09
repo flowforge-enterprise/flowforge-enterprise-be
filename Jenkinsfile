@@ -57,14 +57,6 @@ spec:
         skipDefaultCheckout(true)
     }
 
-    parameters {
-        choice(
-            name: 'TARGET_ENV',
-            choices: ['test', 'prod'],
-            description: 'Deploy target environment. test -> flowforge-test, prod -> flowforge-prod.'
-        )
-    }
-
     environment {
         ACR_REGISTRY = 'crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com'
         IMAGE_REPOSITORY = 'nus_flowforge/flowforge-enterprise-be'
@@ -88,10 +80,11 @@ spec:
                         error("Job 名必须是服务名或以服务名结尾。允许值: ${services.join(', ')}")
                     }
                     env.SERVICE_NAME = matches[0]
-                    env.TARGET_ENV = params.TARGET_ENV ?: 'test'
-                    if (!(env.TARGET_ENV in ['test', 'prod'])) {
-                        error("TARGET_ENV 只能是 test 或 prod，当前值: ${env.TARGET_ENV}")
+                    def jobFolder = env.JOB_NAME.tokenize('/').find { it in ['test', 'prod'] }
+                    if (!jobFolder) {
+                        error("Job 必须位于 test 或 prod 文件夹中，当前 Job: ${env.JOB_NAME}")
                     }
+                    env.TARGET_ENV = jobFolder
                     env.K8S_NAMESPACE = "flowforge-${env.TARGET_ENV}"
                     env.SHORT_COMMIT = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
                     env.IMAGE_TAG = "${env.TARGET_ENV}-${BUILD_NUMBER}-${env.SHORT_COMMIT}"
