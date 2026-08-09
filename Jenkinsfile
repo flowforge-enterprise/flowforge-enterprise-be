@@ -22,21 +22,21 @@ spec:
     - name: jnlp
       image: docker.m.daocloud.io/jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
       resources:
-        requests: {cpu: 100m, memory: 256Mi}
+        requests: {cpu: 50m, memory: 128Mi}
     - name: maven
       image: docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17
       command: ["sleep"]
       args: ["99d"]
       tty: true
       resources:
-        requests: {cpu: 500m, memory: 1Gi}
+        requests: {cpu: 250m, memory: 512Mi}
         limits: {cpu: "2", memory: 3Gi}
     - name: kaniko
       image: registry.cn-hangzhou.aliyuncs.com/kube-image-repo/kaniko:v1.9.1-debug
       command: ["/busybox/cat"]
       tty: true
       resources:
-        requests: {cpu: 500m, memory: 1Gi}
+        requests: {cpu: 250m, memory: 512Mi}
         limits: {cpu: "2", memory: 3Gi}
     - name: kubectl
       image: docker.m.daocloud.io/alpine/k8s:1.36.1
@@ -44,7 +44,7 @@ spec:
       args: ["99d"]
       tty: true
       resources:
-        requests: {cpu: 100m, memory: 128Mi}
+        requests: {cpu: 50m, memory: 128Mi}
         limits: {cpu: 500m, memory: 512Mi}
 '''
         }
