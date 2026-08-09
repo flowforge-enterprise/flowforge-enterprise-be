@@ -6,7 +6,7 @@ controller:
     pullPolicy: IfNotPresent
 
   nodeSelector:
-    workload: jenkins
+    workload: nonprod
 
   resources:
     requests:

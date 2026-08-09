@@ -7,3 +7,32 @@ resources:
   - namespace.yaml
   - ../../base
 
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          workload: prod
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - key: workload
+            operator: Equal
+            value: prod
+            effect: NoSchedule
+  - target:
+      kind: StatefulSet
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          workload: prod
+      - op: add
+        path: /spec/template/spec/tolerations
+        value:
+          - key: workload
+            operator: Equal
+            value: prod
+            effect: NoSchedule

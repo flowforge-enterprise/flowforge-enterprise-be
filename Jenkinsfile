@@ -16,6 +16,8 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
+  nodeSelector:
+    workload: nonprod
   containers:
     - name: jnlp
       image: docker.m.daocloud.io/jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25

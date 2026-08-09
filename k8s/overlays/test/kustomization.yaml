@@ -6,3 +6,19 @@ namespace: flowforge-test
 resources:
   - namespace.yaml
   - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          workload: nonprod
+  - target:
+      kind: StatefulSet
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          workload: nonprod
