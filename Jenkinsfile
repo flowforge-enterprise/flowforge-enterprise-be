@@ -116,7 +116,14 @@ spec:
         stage('Test') {
             when { expression { env.SHOULD_BUILD == 'true' } }
             steps {
-                sh 'mvn -B -ntp -f microservices/pom.xml -pl "$SERVICE_NAME" -am clean verify'
+                sh '''
+                    mvn -B -ntp \
+                      -s microservices/settings.xml \
+                      -U \
+                      -Dmaven.wagon.http.retryHandler.count=5 \
+                      -f microservices/pom.xml \
+                      -pl "$SERVICE_NAME" -am clean verify
+                '''
             }
         }
 
@@ -135,6 +142,10 @@ spec:
                               --dockerfile "$WORKSPACE/microservices/Dockerfile" \
                               --build-arg "MODULE=$SERVICE_NAME" \
                               --destination "$ACR_REGISTRY/$IMAGE_REPOSITORY:$SERVICE_NAME-$IMAGE_TAG" \
+                              --cache=true \
+                              --cache-copy-layers=true \
+                              --cache-run-layers=true \
+                              --cache-ttl=168h \
                               --snapshot-mode=redo \
                               --use-new-run
                         '''

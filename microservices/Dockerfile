@@ -2,7 +2,11 @@ FROM docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17 AS build
 ARG MODULE
 WORKDIR /workspace
 COPY . .
-RUN mvn -q -pl ${MODULE} -am package -DskipTests
+RUN mvn -B -ntp \
+    -s /workspace/settings.xml \
+    -U \
+    -Dmaven.wagon.http.retryHandler.count=5 \
+    -pl ${MODULE} -am package -DskipTests
 
 FROM docker.m.daocloud.io/library/eclipse-temurin:17-jre
 ARG MODULE
