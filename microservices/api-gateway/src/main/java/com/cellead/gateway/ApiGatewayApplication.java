@@ -12,7 +12,6 @@ public class ApiGatewayApplication {
     SpringApplication.run(ApiGatewayApplication.class, args);
   }
 
-  // test
   @Bean
   GlobalFilter correlationIdFilter() {
     return (exchange, chain) -> {
