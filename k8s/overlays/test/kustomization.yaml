@@ -10,7 +10,7 @@ resources:
 images:
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/api-gateway
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-  newTag: api-gateway-test-21-77fbbab4a312
+  newTag: api-gateway-test-23-6fbfe2ccb5cf
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/attachment-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
   newTag: attachment-service-test-20-6fbfe2ccb5cf
