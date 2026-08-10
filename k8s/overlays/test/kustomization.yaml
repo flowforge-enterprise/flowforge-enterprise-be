@@ -26,6 +26,24 @@ images:
 
 patches:
 - patch: |-
+    $patch: delete
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: flowforge-attachment-pvc
+  target:
+    kind: PersistentVolumeClaim
+    name: flowforge-attachment-pvc
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: attachment-data
+        emptyDir: {}
+  target:
+    kind: Deployment
+    name: attachment-service
+- patch: |-
     - op: add
       path: /spec/template/spec/nodeSelector
       value:

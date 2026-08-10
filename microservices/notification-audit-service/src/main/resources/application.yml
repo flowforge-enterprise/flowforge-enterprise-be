@@ -9,6 +9,7 @@ spring:
     hibernate.ddl-auto: validate
     open-in-view: false
 management.endpoints.web.exposure.include: health,info,metrics,prometheus
+info.app.features.audit-notifications: true
 logging.pattern.console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level service=${spring.application.name} correlationId=%X{correlationId:-none} logger=%logger{36} msg=%msg%n"
 app:
   jwt.secret: ${APP_JWT_SECRET}
