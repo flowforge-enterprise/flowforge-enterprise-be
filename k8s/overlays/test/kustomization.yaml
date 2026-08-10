@@ -22,7 +22,7 @@ images:
   newTag: auth-service-test-15-6fbfe2ccb5cf
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/notification-audit-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-  newTag: notification-audit-service-test-37-cee506deba78
+  newTag: notification-audit-service-test-38-3a09520739fe
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/workflow-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
   newTag: workflow-service-test-35-3a09520739fe
