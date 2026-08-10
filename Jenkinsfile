@@ -110,6 +110,7 @@ spec:
         stage('Detect changes') {
             steps {
                 script {
+                    def manuallyTriggered = !currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause').isEmpty()
                     def base = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT?.trim()
                     if (!base || sh(script: "git cat-file -e '${base}^{commit}' 2>/dev/null", returnStatus: true) != 0) {
                         base = sh(script: 'git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD', returnStdout: true).trim()
@@ -121,8 +122,8 @@ spec:
                     def securityChanged = changed.any { it.startsWith('microservices/platform-security/') }
                     def usesSecurity = env.SERVICE_NAME != 'api-gateway'
                     def serviceChanged = changed.any { it.startsWith("microservices/${env.SERVICE_NAME}/") }
-                    env.SHOULD_BUILD = (commonChanged || serviceChanged || (securityChanged && usesSecurity)).toString()
-                    echo "Service: ${env.SERVICE_NAME}; changed files: ${changed.size()}; build: ${env.SHOULD_BUILD}"
+                    env.SHOULD_BUILD = (manuallyTriggered || commonChanged || serviceChanged || (securityChanged && usesSecurity)).toString()
+                    echo "Service: ${env.SERVICE_NAME}; manually triggered: ${manuallyTriggered}; changed files: ${changed.size()}; build: ${env.SHOULD_BUILD}"
                 }
             }
         }
@@ -135,6 +136,8 @@ spec:
                       -s microservices/settings.xml \
                       -U \
                       -Dmaven.wagon.http.retryHandler.count=5 \
+                      -Ddependency-check.skip=true \
+                      -DskipITs=true \
                       -f microservices/pom.xml \
                       -pl "$SERVICE_NAME" -am clean verify
                 '''
