@@ -22,7 +22,7 @@ spring:
       - id: workflow-service
         uri: ${WORKFLOW_SERVICE_URL:http://localhost:8082}
         predicates:
-          - Path=/api/workflows/**,/api/approvals/**,/api/workflow-templates/**
+          - Path=/api/workflows/**,/api/approvals/**,/api/workflow-templates/**,/api/regulatory/**,/internal/regulatory/**
         filters:
           - name: CircuitBreaker
             args: { name: workflowCircuit, fallbackUri: "forward:/fallback/workflow" }

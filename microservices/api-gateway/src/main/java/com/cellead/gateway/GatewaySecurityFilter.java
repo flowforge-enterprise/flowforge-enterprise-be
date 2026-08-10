@@ -62,6 +62,7 @@ final class GatewaySecurityFilter implements GlobalFilter, Ordered {
   private boolean isPublic(String path) {
     return path.equals("/api/auth/login")
         || path.equals("/api/auth/refresh")
+        || path.startsWith("/internal/regulatory/")
         || path.startsWith("/actuator/")
         || path.startsWith("/docs/")
         || path.startsWith("/swagger-ui")

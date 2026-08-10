@@ -782,6 +782,79 @@ jobs:
           name: k6-stress-test-results
           path: stress-test/
 
+  publish-compliance-evidence:
+    name: Compliance | Publish regulatory evidence
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - build-test
+      - lint-check
+      - snyk-sca
+      - snyk-sast
+      - trivy-image-scan
+      - iac-scan
+      - dast-scan
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.detect-changes.outputs.has_changes == 'true'
+    env:
+      REGULATORY_API_URL: ${{ secrets.REGULATORY_API_URL }}
+      INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Publish CI, IaC, and OWASP control evidence
+        shell: bash
+        env:
+          BUILD_RESULT: ${{ needs.build-test.result }}
+          LINT_RESULT: ${{ needs.lint-check.result }}
+          SNYK_SCA_RESULT: ${{ needs.snyk-sca.result }}
+          SNYK_SAST_RESULT: ${{ needs.snyk-sast.result }}
+          TRIVY_RESULT: ${{ needs.trivy-image-scan.result }}
+          IAC_RESULT: ${{ needs.iac-scan.result }}
+          DAST_RESULT: ${{ needs.dast-scan.result }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$REGULATORY_API_URL" ] || [ -z "$INTERNAL_API_KEY" ]; then
+            echo "REGULATORY_API_URL and INTERNAL_API_KEY secrets are required."
+            exit 1
+          fi
+
+          API_BASE="${REGULATORY_API_URL%/}/internal/regulatory/frameworks/BASIC-SECURITY/controls"
+
+          publish_control() {
+            local control="$1"
+            local status="$2"
+            local note="$3"
+            local payload
+            payload="$(jq -n --arg status "$status" --arg note "$note" \
+              '{status: $status, evidenceNote: $note}')"
+            curl --fail --silent --show-error \
+              --retry 3 --retry-all-errors \
+              --request PATCH \
+              --header "X-Internal-Key: $INTERNAL_API_KEY" \
+              --header "Content-Type: application/json" \
+              --data "$payload" \
+              "$API_BASE/$control" >/dev/null
+          }
+
+          CI_STATUS=IN_PROGRESS
+          if [ "$BUILD_RESULT" = success ] && [ "$LINT_RESULT" = success ] && \
+             [ "$SNYK_SCA_RESULT" = success ] && [ "$SNYK_SAST_RESULT" = success ] && \
+             [ "$TRIVY_RESULT" = success ]; then
+            CI_STATUS=COMPLIANT
+          fi
+          publish_control CI-01 "$CI_STATUS" \
+            "Build=$BUILD_RESULT; Checkstyle=$LINT_RESULT; SCA=$SNYK_SCA_RESULT; SAST=$SNYK_SAST_RESULT; Trivy=$TRIVY_RESULT; $RUN_URL"
+
+          publish_control IA-01 IN_PROGRESS \
+            "Checkov=$IAC_RESULT (evidence-only soft-fail policy); $RUN_URL"
+
+          publish_control AS-01 IN_PROGRESS \
+            "OWASP DAST=$DAST_RESULT (active scan intentionally disabled); $RUN_URL"
+
   trigger-jenkins:
     name: Deployment | Trigger Jenkins
     runs-on: ubuntu-latest
