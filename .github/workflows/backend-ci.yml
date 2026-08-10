@@ -778,6 +778,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p stress-test/results
+          chmod 0777 stress-test/results
           printf 'run_url=%s/%s/actions/runs/%s\ncommit=%s\n' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_SHA" \
             > stress-test/results/run-metadata.txt
