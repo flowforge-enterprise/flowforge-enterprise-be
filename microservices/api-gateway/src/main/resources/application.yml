@@ -22,6 +22,7 @@ spring:
       - id: workflow-service
         uri: ${WORKFLOW_SERVICE_URL:http://localhost:8082}
         predicates:
+          # Includes the API-key-protected regulatory evidence endpoint used by GitHub Actions.
           - Path=/api/workflows/**,/api/approvals/**,/api/workflow-templates/**,/api/regulatory/**,/internal/regulatory/**
         filters:
           - name: CircuitBreaker
