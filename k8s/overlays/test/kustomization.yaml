@@ -16,7 +16,7 @@ images:
   newTag: api-gateway-test-42-b1fd9a115b29
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/attachment-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-  newTag: attachment-service-test-20-6fbfe2ccb5cf
+  newTag: attachment-service-test-42-cadaca58b915
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/auth-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
   newTag: auth-service-test-15-6fbfe2ccb5cf
