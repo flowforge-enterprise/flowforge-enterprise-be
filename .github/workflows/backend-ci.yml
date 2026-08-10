@@ -832,7 +832,8 @@ jobs:
             payload="$(jq -n --arg status "$status" --arg note "$note" \
               '{status: $status, evidenceNote: $note}')"
             curl --fail --silent --show-error \
-              --retry 3 --retry-all-errors \
+              --connect-timeout 10 --max-time 30 \
+              --retry 60 --retry-delay 15 --retry-max-time 900 --retry-all-errors \
               --request PATCH \
               --header "X-Internal-Key: $INTERNAL_API_KEY" \
               --header "Content-Type: application/json" \
