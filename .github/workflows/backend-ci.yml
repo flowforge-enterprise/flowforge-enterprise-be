@@ -17,6 +17,12 @@ on:
       - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
     inputs:
+      run_dast_full:
+        description: "Run OWASP ZAP active full scan against the test stack"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
       run_stress:
         description: "Run k6 stress test"
         required: false
@@ -638,9 +644,13 @@ jobs:
   dast-scan:
     name: Security | OWASP ZAP DAST
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: [detect-changes, integration-container-evidence]
-    # DAST is disabled until an explicit decision is made to run active scans.
-    if: ${{ false }}
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.integration-container-evidence.result == 'success' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -698,6 +708,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Run OWASP ZAP full scan
+        if: github.event_name == 'workflow_dispatch' && inputs.run_dast_full == 'true'
         uses: zaproxy/action-full-scan@v0.8.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
@@ -889,8 +900,6 @@ jobs:
       needs.snyk-sca.result == 'success' &&
       needs.snyk-sast.result == 'success' &&
       needs.trivy-image-scan.result == 'success' &&
-      needs.dast-scan.result != 'failure' &&
-      needs.dast-scan.result != 'cancelled' &&
       needs.stress-test.result != 'failure' &&
       needs.stress-test.result != 'cancelled'
     env:
