@@ -22,7 +22,7 @@ images:
   newTag: auth-service-test-15-6fbfe2ccb5cf
 - name: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/workflow-service
   newName: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/flowforge-enterprise-be
-  newTag: workflow-service-test-15-6fbfe2ccb5cf
+  newTag: workflow-service-test-26-39eadcc9e6b5
 
 patches:
 - patch: |-
