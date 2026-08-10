@@ -24,7 +24,7 @@ class RegulatoryFrameworkTest {
     RegulatoryFrameworkEntity framework = framework();
     RegulatoryControl control = control();
     when(frameworks.findAll()).thenReturn(List.of(framework));
-    when(frameworks.findByCode("BASIC-SECURITY")).thenReturn(Optional.of(framework));
+    when(frameworks.findByCode("SOC2")).thenReturn(Optional.of(framework));
     when(controls.findById(10L)).thenReturn(Optional.of(control));
     when(controls.findByFrameworkIdOrderByControlCode(1L)).thenReturn(List.of(control));
     RegulatoryFrameworkService service = new RegulatoryFrameworkService(frameworks, controls);
@@ -34,7 +34,7 @@ class RegulatoryFrameworkTest {
     assertThat(controller.list()).singleElement().satisfies(item -> assertThat(item.total()).isOne());
     RegulatoryFrameworkResponse response =
         controller.update(
-            "BASIC-SECURITY",
+            "SOC2",
             10L,
             new ControlUpdateRequest(ControlStatus.COMPLIANT, "CI evidence #123"),
             ADMIN);
@@ -53,7 +53,7 @@ class RegulatoryFrameworkTest {
     assertThatThrownBy(
             () ->
                 controller.update(
-                    "BASIC-SECURITY",
+                    "SOC2",
                     10L,
                     new ControlUpdateRequest(ControlStatus.COMPLIANT, null),
                     REQUESTER))
@@ -69,13 +69,13 @@ class RegulatoryFrameworkTest {
         new ControlUpdateRequest(ControlStatus.COMPLIANT, "GitHub Actions run");
 
     assertThatThrownBy(
-            () -> controller.update("BASIC-SECURITY", "CI-01", request, "wrong-key"))
+            () -> controller.update("SOC2", "CC8.1", request, "wrong-key"))
         .isInstanceOf(ResponseStatusException.class);
-    controller.update("BASIC-SECURITY", "CI-01", request, "internal-key");
+    controller.update("SOC2", "CC8.1", request, "internal-key");
     org.mockito.Mockito.verify(service)
         .updateByCode(
-            org.mockito.ArgumentMatchers.eq("BASIC-SECURITY"),
-            org.mockito.ArgumentMatchers.eq("CI-01"),
+            org.mockito.ArgumentMatchers.eq("SOC2"),
+            org.mockito.ArgumentMatchers.eq("CC8.1"),
             org.mockito.ArgumentMatchers.eq(request),
             org.mockito.ArgumentMatchers.argThat(user -> "github-actions".equals(user.username())));
   }
@@ -83,9 +83,9 @@ class RegulatoryFrameworkTest {
   private RegulatoryFrameworkEntity framework() {
     RegulatoryFrameworkEntity framework = new RegulatoryFrameworkEntity();
     framework.id = 1L;
-    framework.code = "BASIC-SECURITY";
-    framework.name = "Basic Security Framework";
-    framework.description = "Baseline";
+    framework.code = "SOC2";
+    framework.name = "SOC 2 Readiness Framework";
+    framework.description = "SOC 2 readiness evidence";
     framework.createdAt = Instant.now();
     return framework;
   }
@@ -94,8 +94,8 @@ class RegulatoryFrameworkTest {
     RegulatoryControl control = new RegulatoryControl();
     control.id = 10L;
     control.frameworkId = 1L;
-    control.controlCode = "AC-01";
-    control.title = "Access control";
+    control.controlCode = "CC6.1";
+    control.title = "Logical access controls";
     control.description = "JWT and RBAC";
     control.status = ControlStatus.IN_PROGRESS;
     control.updatedAt = Instant.now();

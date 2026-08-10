@@ -776,22 +776,34 @@ jobs:
 
       - name: Run k6 stress test
         run: |
+          set -o pipefail
+          mkdir -p stress-test/results
+          printf 'run_url=%s/%s/actions/runs/%s\ncommit=%s\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_SHA" \
+            > stress-test/results/run-metadata.txt
           docker run --rm \
             --network host \
             -v "$PWD/stress-test:/scripts" \
-            grafana/k6 run /scripts/stress-test.js
+            grafana/k6 run \
+              --summary-export=/scripts/results/summary.json \
+              --out json=/scripts/results/metrics.json \
+              /scripts/stress-test.js 2>&1 | tee stress-test/results/console.log
 
       - name: Stop stress-test services
         if: always()
         working-directory: microservices
         run: docker compose down -v
 
-      - name: Upload k6 evidence
+      - name: Upload k6 artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k6-stress-test-results
-          path: stress-test/
+          path: |
+            stress-test/stress-test.js
+            stress-test/results/
+          if-no-files-found: error
+          retention-days: 30
 
   publish-compliance-evidence:
     name: Compliance | Publish regulatory evidence
@@ -833,7 +845,7 @@ jobs:
             exit 1
           fi
 
-          API_BASE="${REGULATORY_API_URL%/}/internal/regulatory/frameworks/BASIC-SECURITY/controls"
+          API_BASE="${REGULATORY_API_URL%/}/internal/regulatory/frameworks/SOC2/controls"
 
           publish_control() {
             local control="$1"
@@ -858,13 +870,13 @@ jobs:
              [ "$TRIVY_RESULT" = success ]; then
             CI_STATUS=COMPLIANT
           fi
-          publish_control CI-01 "$CI_STATUS" \
+          publish_control CC8.1 "$CI_STATUS" \
             "Build=$BUILD_RESULT; Checkstyle=$LINT_RESULT; SCA=$SNYK_SCA_RESULT; SAST=$SNYK_SAST_RESULT; Trivy=$TRIVY_RESULT; $RUN_URL"
 
-          publish_control IA-01 IN_PROGRESS \
+          publish_control CC7.2 IN_PROGRESS \
             "Checkov=$IAC_RESULT (evidence-only soft-fail policy); $RUN_URL"
 
-          publish_control AS-01 IN_PROGRESS \
+          publish_control CC7.1 IN_PROGRESS \
             "OWASP DAST=$DAST_RESULT (active scan intentionally disabled); $RUN_URL"
 
   trigger-jenkins:
