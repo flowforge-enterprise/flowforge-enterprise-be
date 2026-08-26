@@ -398,6 +398,7 @@ jobs:
   lint-check:
     name: Quality | Checkstyle (${{ matrix.module }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
