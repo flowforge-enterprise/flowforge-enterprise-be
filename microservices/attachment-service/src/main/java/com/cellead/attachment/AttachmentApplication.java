@@ -284,9 +284,10 @@ class AttachmentController {
       @RequestPart("file") MultipartFile file,
       @AuthenticationPrincipal AuthenticatedUser user) {
     authorize(workflowId, user);
+    String rawName = file.getOriginalFilename();
     String name =
         StringUtils.cleanPath(
-            file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename());
+            rawName == null || rawName.isBlank() ? "attachment" : rawName);
     if (name.contains("..")) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename");
     }
