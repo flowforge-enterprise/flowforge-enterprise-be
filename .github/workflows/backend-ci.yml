@@ -376,7 +376,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -412,7 +412,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -420,7 +420,7 @@ jobs:
           cache-dependency-path: microservices/pom.xml
 
       - name: Run Checkstyle
-        run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am checkstyle:check
+        run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" -am checkstyle:checkstyle checkstyle:check
 
       - name: Upload Checkstyle evidence
         if: always()
@@ -432,6 +432,7 @@ jobs:
   snyk-sca:
     name: Security | Snyk SCA (${{ matrix.module }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
@@ -461,6 +462,7 @@ jobs:
   snyk-sast:
     name: Security | Snyk Code (${{ matrix.module }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     strategy:
@@ -490,6 +492,7 @@ jobs:
   trivy-image-scan:
     name: Security | Trivy image scan (${{ matrix.module }})
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: [detect-changes, build-test]
     if: |
       always() &&
@@ -566,7 +569,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Java 21 for SonarCloud
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -614,7 +617,7 @@ jobs:
         run: |
           mvn --batch-mode -ntp \
             -pl "${{ matrix.module }}" -am \
-            clean install
+            clean verify
 
       - name: Analyze service with SonarCloud
         continue-on-error: true

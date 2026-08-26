@@ -19,7 +19,7 @@ spec:
         runAsUser: 0
       containers:
         - name: jenkins
-          image: jenkins/jenkins:lts
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/jenkins:lts
           ports:
             - containerPort: 8080
               name: web
