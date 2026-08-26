@@ -155,6 +155,96 @@ class AttachmentApplicationTest {
         .isEqualTo(HttpStatus.NOT_FOUND);
   }
 
+  @Test
+  void upload_rejectsPathTraversalFilename() throws Exception {
+    startAccessServer(true);
+    AttachmentRepository repository = mock(AttachmentRepository.class);
+    AttachmentStorage storage = new AttachmentStorage(temp.toString());
+    AttachmentController controller = controller(repository, storage);
+    AuthenticatedUser user = new AuthenticatedUser(7L, "requester", "REQUESTER");
+
+    assertThatThrownBy(
+            () ->
+                controller.upload(
+                    5L,
+                    new MockMultipartFile("file", "../secret.txt", "text/plain", "x".getBytes()),
+                    user))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void upload_usesDefaultNameForNullOriginalFilename() throws Exception {
+    startAccessServer(true);
+    AttachmentRepository repository = mock(AttachmentRepository.class);
+    AttachmentStorage storage = new AttachmentStorage(temp.toString());
+    AttachmentController controller = controller(repository, storage);
+    AuthenticatedUser user = new AuthenticatedUser(7L, "requester", "REQUESTER");
+    when(repository.save(any(AttachmentRecord.class)))
+        .thenAnswer(
+            inv -> {
+              AttachmentRecord r = inv.getArgument(0);
+              r.id = 1L;
+              return r;
+            });
+
+    AttachmentResponse response =
+        controller.upload(
+            5L, new MockMultipartFile("file", null, "text/plain", "data".getBytes()), user);
+    assertThat(response.originalName()).isEqualTo("attachment");
+  }
+
+  @Test
+  void upload_deletesStoredFileWhenRepositoryThrows() throws Exception {
+    startAccessServer(true);
+    AttachmentRepository repository = mock(AttachmentRepository.class);
+    AttachmentStorage storage = new AttachmentStorage(temp.toString());
+    AttachmentController controller = controller(repository, storage);
+    AuthenticatedUser user = new AuthenticatedUser(7L, "requester", "REQUESTER");
+    when(repository.save(any())).thenThrow(new RuntimeException("DB down"));
+
+    assertThatThrownBy(
+            () ->
+                controller.upload(
+                    5L,
+                    new MockMultipartFile("file", "proof.txt", "text/plain", "data".getBytes()),
+                    user))
+        .isInstanceOf(RuntimeException.class);
+    assertThat(Files.list(temp)).isEmpty();
+  }
+
+  @Test
+  void delete_adminCanDeleteAnothersAttachment() throws Exception {
+    startAccessServer(true);
+    AttachmentRepository repository = mock(AttachmentRepository.class);
+    AttachmentStorage storage = new AttachmentStorage(temp.toString());
+    AttachmentController controller = controller(repository, storage);
+    AuthenticatedUser uploader = new AuthenticatedUser(7L, "uploader", "REQUESTER");
+    AuthenticatedUser admin = new AuthenticatedUser(99L, "admin", "ADMIN");
+
+    StoredFile stored =
+        storage.save(
+            new MockMultipartFile("file", "doc.txt", "text/plain", "hello".getBytes()));
+    AttachmentRecord record =
+        new AttachmentRecord(5L, uploader, "doc.txt", stored.key(), "text/plain", 5, stored.sha256());
+    record.id = 22L;
+    when(repository.findById(22L)).thenReturn(Optional.of(record));
+
+    controller.delete(22L, admin);
+    verify(repository).delete(record);
+    assertThat(Files.list(temp)).isEmpty();
+  }
+
+  @Test
+  void storageRejectsPathTraversalKeyOnDelete() throws Exception {
+    AttachmentStorage storage = new AttachmentStorage(temp.toString());
+    assertThatThrownBy(() -> storage.delete("../../../etc/shadow"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
   private AttachmentController controller(
       AttachmentRepository repository, AttachmentStorage storage) {
     RestClient workflows = RestClient.builder().baseUrl(serverUrl()).build();
