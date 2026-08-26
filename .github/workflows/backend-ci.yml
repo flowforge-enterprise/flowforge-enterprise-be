@@ -174,8 +174,9 @@ jobs:
     name: Test | Integration and container evidence
     runs-on: ubuntu-latest
     needs: [detect-changes, trivy-image-scan, validate-compose]
-    # Temporarily disabled for the Jenkins deployment demonstration.
-    if: ${{ false }}
+    if: |
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.trivy-image-scan.result == 'success'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -641,8 +642,10 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     needs: [detect-changes, integration-container-evidence]
-    # Temporarily disabled for the Jenkins deployment demonstration.
-    if: ${{ false }}
+    if: |
+      always() &&
+      needs.detect-changes.outputs.has_changes == 'true' &&
+      needs.integration-container-evidence.result == 'success'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -689,7 +692,7 @@ jobs:
 
       # ZAP is evidence-only for now (continue-on-error + fail_action=false).
       - name: Run OWASP ZAP baseline scan
-        uses: zaproxy/action-baseline@v0.10.0
+        uses: zaproxy/action-baseline@v0.14.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: ".zap/rules.tsv"
@@ -700,8 +703,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Run OWASP ZAP full scan
-        if: github.event_name == 'workflow_dispatch' && inputs.run_dast_full == 'true'
-        uses: zaproxy/action-full-scan@v0.8.0
+        uses: zaproxy/action-full-scan@v0.11.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: ".zap/rules.tsv"
