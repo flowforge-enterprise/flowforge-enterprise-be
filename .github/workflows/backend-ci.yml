@@ -402,6 +402,7 @@ jobs:
           cache-dependency-path: microservices/pom.xml
 
       - name: Build platform-security
+        if: matrix.module != 'platform-security'
         run: mvn --batch-mode -ntp -pl platform-security -am clean install -DskipTests
 
       - name: Build and test service
