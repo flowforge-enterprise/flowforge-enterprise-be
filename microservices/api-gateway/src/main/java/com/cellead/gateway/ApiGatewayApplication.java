@@ -32,6 +32,15 @@ public class ApiGatewayApplication {
       headers.setCacheControl("no-store, no-cache, must-revalidate");
       headers.setPragma("no-cache");
       headers.setExpires(0);
+      headers.set(
+          "Content-Security-Policy",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+              + "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; "
+              + "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");
+      headers.set(
+          "Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+      headers.set("X-Content-Type-Options", "nosniff");
+      headers.set("Cross-Origin-Resource-Policy", "same-origin");
       return chain.filter(exchange);
     };
   }

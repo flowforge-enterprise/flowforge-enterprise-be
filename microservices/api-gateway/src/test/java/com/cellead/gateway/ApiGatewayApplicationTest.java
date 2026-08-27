@@ -64,6 +64,20 @@ class ApiGatewayApplicationTest {
         current.getResponse().getHeaders().getCacheControl());
     assertEquals("no-cache", current.getResponse().getHeaders().getPragma());
     assertEquals(0, current.getResponse().getHeaders().getExpires());
+    assertTrue(
+        current
+            .getResponse()
+            .getHeaders()
+            .getFirst("Content-Security-Policy")
+            .contains("frame-ancestors 'none'"));
+    assertEquals(
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        current.getResponse().getHeaders().getFirst("Permissions-Policy"));
+    assertEquals(
+        "nosniff", current.getResponse().getHeaders().getFirst("X-Content-Type-Options"));
+    assertEquals(
+        "same-origin",
+        current.getResponse().getHeaders().getFirst("Cross-Origin-Resource-Policy"));
   }
 
   @Test
