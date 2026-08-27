@@ -8,8 +8,30 @@ if ([string]::IsNullOrWhiteSpace($Password)) {
 }
 
 function Login([string]$Username) {
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/login" -ContentType "application/json" `
-        -Body (@{ username = $Username; password = $Password } | ConvertTo-Json)
+    $deadline = (Get-Date).AddSeconds(60)
+    $lastError = $null
+
+    do {
+        try {
+            return Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/auth/login" -ContentType "application/json" `
+                -Body (@{ username = $Username; password = $Password } | ConvertTo-Json)
+        }
+        catch {
+            $lastError = $_
+            $statusCode = if ($null -ne $_.Exception.Response) {
+                [int]$_.Exception.Response.StatusCode
+            } else {
+                $null
+            }
+            if ($null -ne $statusCode -and $statusCode -lt 500) {
+                throw
+            }
+            Write-Host "Login for '$Username' is not ready yet; retrying in 2 seconds."
+            Start-Sleep -Seconds 2
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Login for '$Username' did not become available within 60 seconds: $($lastError.Exception.Message)"
 }
 
 $requester = Login "requester"
