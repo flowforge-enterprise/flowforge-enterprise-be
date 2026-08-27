@@ -274,6 +274,21 @@ jobs:
           wait_http "ai-assistant-health" "http://localhost:8084/actuator/health" "200"
           wait_http "attachment-health" "http://localhost:8085/actuator/health" "200"
 
+      - name: Run API end-to-end smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force evidence/integration | Out-Null
+
+          & ./microservices/scripts/smoke-test.ps1 `
+            -BaseUrl "http://localhost:$env:GATEWAY_PORT" `
+            -Password $env:DEFAULT_PASSWORD |
+            Tee-Object -FilePath evidence/integration/api-e2e-smoke-test.json
+
+          Add-Content `
+            -Path evidence/integration/smoke-test.md `
+            -Value "`n- API end-to-end smoke test: passed"
+
       - name: Collect container inspection evidence
         if: always()
         run: |
