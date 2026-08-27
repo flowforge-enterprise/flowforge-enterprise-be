@@ -384,7 +384,7 @@ jobs:
           cache-dependency-path: microservices/pom.xml
 
       - name: Build platform-security
-        run: mvn --batch-mode -ntp -pl platform-security clean install -DskipTests
+        run: mvn --batch-mode -ntp -pl platform-security -am clean install -DskipTests
 
       - name: Build and test service
         run: mvn --batch-mode -ntp -pl "${{ matrix.module }}" clean verify
@@ -618,7 +618,7 @@ jobs:
           echo "SonarCloud project: $PROJECT_KEY"
 
       - name: Build platform-security
-        run: mvn --batch-mode -ntp -pl platform-security clean install -DskipTests
+        run: mvn --batch-mode -ntp -pl platform-security -am clean install -DskipTests
 
       - name: Build and test service
         run: |
