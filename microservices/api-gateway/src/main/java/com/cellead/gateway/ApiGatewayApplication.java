@@ -5,6 +5,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.server.WebFilter;
 
 
 @SpringBootApplication
@@ -20,6 +22,17 @@ public class ApiGatewayApplication {
       var request = exchange.getRequest().mutate().header("X-Correlation-ID", id).build();
       exchange.getResponse().getHeaders().set("X-Correlation-ID", id);
       return chain.filter(exchange.mutate().request(request).build());
+    };
+  }
+
+  @Bean
+  WebFilter securityResponseHeaders() {
+    return (exchange, chain) -> {
+      HttpHeaders headers = exchange.getResponse().getHeaders();
+      headers.setCacheControl("no-store, no-cache, must-revalidate");
+      headers.setPragma("no-cache");
+      headers.setExpires(0);
+      return chain.filter(exchange);
     };
   }
 }

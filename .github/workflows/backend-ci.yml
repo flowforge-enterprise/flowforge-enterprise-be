@@ -692,38 +692,43 @@ jobs:
         run: |
           mkdir -p .zap
           cat > .zap/rules.tsv << 'EOF'
-          10028	WARN
-          10029	WARN
-          10033	WARN
-          10043	WARN
-          10045	WARN
-          10046	WARN
-          10048	WARN
-          10062	WARN
-          10099	WARN
-          10105	WARN
+          10028	WARN	(Off-site redirect)
+          10029	WARN	(Cookie poisoning)
+          10033	WARN	(Directory browsing)
+          10043	WARN	(User-controllable JavaScript event)
+          10045	WARN	(Source code disclosure)
+          10046	WARN	(Suspicious comments)
+          10048	WARN	(Remote code execution)
+          10049	IGNORE	(Responses are intentionally protected with Cache-Control no-store)
+          10062	WARN	(PII disclosure)
+          10099	WARN	(Source code disclosure)
+          10105	WARN	(Weak authentication method)
+          # Fetch Metadata headers are browser-supplied request headers; ZAP's own requests omit them.
+          90005	IGNORE	(Fetch Metadata request headers are client-supplied)
           EOF
 
       # ZAP is evidence-only for now (continue-on-error + fail_action=false).
       - name: Run OWASP ZAP baseline scan
-        uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: ".zap/rules.tsv"
           cmd_options: "-a -j -I"
           fail_action: false
           allow_issue_writing: false
+          artifact_name: zap-baseline-scan
         continue-on-error: true
         timeout-minutes: 10
 
       - name: Run OWASP ZAP full scan
-        uses: zaproxy/action-full-scan@v0.11.0
+        uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: "http://localhost:${{ env.GATEWAY_PORT }}"
           rules_file_name: ".zap/rules.tsv"
           cmd_options: "-a -j -m 5"
           fail_action: false
           allow_issue_writing: false
+          artifact_name: zap-full-scan
         continue-on-error: true
         timeout-minutes: 15
 

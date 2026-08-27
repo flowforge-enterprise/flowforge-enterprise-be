@@ -53,6 +53,20 @@ class ApiGatewayApplicationTest {
   }
 
   @Test
+  void securityResponseHeadersPreventSensitiveResponsesFromBeingCached() {
+    var filter = new ApiGatewayApplication().securityResponseHeaders();
+    var current = exchange(MockServerHttpRequest.get("/missing"));
+
+    filter.filter(current, ignored -> Mono.empty()).block();
+
+    assertEquals(
+        "no-store, no-cache, must-revalidate",
+        current.getResponse().getHeaders().getCacheControl());
+    assertEquals("no-cache", current.getResponse().getHeaders().getPragma());
+    assertEquals(0, current.getResponse().getHeaders().getExpires());
+  }
+
+  @Test
   void securityFilterAllowsPublicAndValidAccessTokens() {
     var filter = new GatewaySecurityFilter(SECRET, new ObjectMapper());
     AtomicBoolean called = new AtomicBoolean();
