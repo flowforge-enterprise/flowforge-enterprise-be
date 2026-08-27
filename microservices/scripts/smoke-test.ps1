@@ -34,10 +34,25 @@ function Login([string]$Username) {
     throw "Login for '$Username' did not become available within 60 seconds: $($lastError.Exception.Message)"
 }
 
+function Complete-Scenario([int]$Number, [string]$Name, [string]$Evidence) {
+    Write-Host "::group::Scenario $Number/6 - $Name"
+    Write-Host "PASS: $Evidence"
+    Write-Host "::endgroup::"
+    return [pscustomobject]@{
+        number = $Number
+        name = $Name
+        status = "PASS"
+        evidence = $Evidence
+    }
+}
+
+$scenarioResults = @()
+
 $requester = Login "requester"
 $approver = Login "approver"
 $requesterHeaders = @{ Authorization = "Bearer $($requester.token)"; "X-Correlation-ID" = "smoke-$([guid]::NewGuid())" }
 $approverHeaders = @{ Authorization = "Bearer $($approver.token)" }
+$scenarioResults += (Complete-Scenario 1 "Authenticate requester and approver" "Both users received access tokens")
 
 $workflow = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/workflows" -Headers $requesterHeaders `
     -ContentType "application/json" -Body (@{
@@ -46,16 +61,20 @@ $workflow = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/workflows" -Header
         requestType = "GENERAL"
         priority = "HIGH"
     } | ConvertTo-Json)
+$scenarioResults += (Complete-Scenario 2 "Submit workflow" "Created workflow $($workflow.id)")
 
 $tasks = @(Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/approvals/tasks" -Headers $approverHeaders)
 if ($workflow.id -notin $tasks.id) { throw "Created workflow is missing from approval tasks" }
+$scenarioResults += (Complete-Scenario 3 "Find approval task" "Workflow $($workflow.id) is visible to the approver")
 
 $decision = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/approvals/$($workflow.id)/approve" `
     -Headers $approverHeaders -ContentType "application/json" -Body '{"comment":"Smoke test approval"}'
 if ($decision.decision -ne "APPROVED") { throw "Approval failed" }
+$scenarioResults += (Complete-Scenario 4 "Approve workflow" "Approval decision is APPROVED")
 
 $detail = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/workflows/$($workflow.id)" -Headers $requesterHeaders
 if ($detail.status -ne "APPROVED") { throw "Workflow status did not update" }
+$scenarioResults += (Complete-Scenario 5 "Verify workflow state" "Workflow status is APPROVED")
 
 $deadline = (Get-Date).AddSeconds(45)
 do {
@@ -64,9 +83,13 @@ do {
     $audits = @($auditResponse)
 } while ($audits.Count -lt 2 -and (Get-Date) -lt $deadline)
 if ($audits.Count -lt 2) { throw "Outbox events were not delivered" }
+$scenarioResults += (Complete-Scenario 6 "Verify audit delivery" "$($audits.Count) audit events were delivered")
 
 [pscustomobject]@{
     workflowId = $workflow.id
     status = $detail.status
     auditActions = $audits.action -join ","
-} | ConvertTo-Json
+    passedScenarios = $scenarioResults.Count
+    totalScenarios = 6
+    scenarios = $scenarioResults
+} | ConvertTo-Json -Depth 4
