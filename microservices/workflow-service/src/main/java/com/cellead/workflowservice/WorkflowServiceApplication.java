@@ -647,10 +647,13 @@ class WorkflowController {
     WorkflowRequest w = get(id);
     policy.authorizeDecision(w, user);
     boolean hasNext = chains.recordDecision(w, decision, body == null ? null : body.comment());
-    w.status =
-        decision == Decision.REJECTED
-            ? WorkflowStatus.REJECTED
-            : (hasNext ? WorkflowStatus.PENDING : WorkflowStatus.APPROVED);
+    if (decision == Decision.REJECTED) {
+      w.status = WorkflowStatus.REJECTED;
+    } else if (hasNext) {
+      w.status = WorkflowStatus.PENDING;
+    } else {
+      w.status = WorkflowStatus.APPROVED;
+    }
     w.updatedAt = Instant.now();
     ApprovalRecord a =
         approvals.save(new ApprovalRecord(w, user, decision, body == null ? null : body.comment()));
