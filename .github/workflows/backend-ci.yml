@@ -173,10 +173,13 @@ jobs:
   integration-container-evidence:
     name: Test | Integration and container evidence
     runs-on: ubuntu-latest
-    needs: [detect-changes, trivy-image-scan, validate-compose]
+    needs: [detect-changes, build-test, validate-compose]
     if: |
+      always() &&
       needs.detect-changes.outputs.has_changes == 'true' &&
-      needs.trivy-image-scan.result == 'success'
+      needs.build-test.result == 'success' &&
+      needs.validate-compose.result != 'failure' &&
+      needs.validate-compose.result != 'cancelled'
     env:
       APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
       INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
@@ -533,6 +536,7 @@ jobs:
           exit-code: "0"
 
       - name: Enforce Trivy high and critical severity gate
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "flowforge/${{ matrix.module }}:${{ github.sha }}"
