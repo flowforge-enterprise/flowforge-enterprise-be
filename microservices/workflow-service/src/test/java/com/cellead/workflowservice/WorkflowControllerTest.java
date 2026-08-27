@@ -139,7 +139,10 @@ class WorkflowControllerTest {
     WorkflowQueryService queries = new WorkflowQueryService(workflows, approvals);
     WorkflowRequest workflow = workflow();
     workflow.status = WorkflowStatus.CANCELLED;
+    workflow.createdAt = Instant.parse("2026-08-27T01:00:00Z");
+    workflow.updatedAt = Instant.parse("2026-08-27T03:00:00Z");
     ApprovalRecord approval = new ApprovalRecord(workflow, APPROVER, Decision.APPROVED, "ok");
+    approval.createdAt = Instant.parse("2026-08-27T02:00:00Z");
     when(approvals.findByWorkflowIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(approval));
     when(workflows.count()).thenReturn(5L);
     when(workflows.countByStatus(WorkflowStatus.PENDING)).thenReturn(1L);
@@ -148,7 +151,7 @@ class WorkflowControllerTest {
     when(workflows.countByStatus(WorkflowStatus.CANCELLED)).thenReturn(1L);
 
     assertThat(queries.timeline(workflow)).extracting(TimelineEvent::type)
-        .containsExactly("SUBMITTED", "CANCELLED", "APPROVED");
+        .containsExactly("SUBMITTED", "APPROVED", "CANCELLED");
     assertThat(queries.statistics()).isEqualTo(new WorkflowStats(5, 1, 2, 1, 1));
   }
 
