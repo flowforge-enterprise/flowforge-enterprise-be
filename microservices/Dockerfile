@@ -8,8 +8,9 @@ RUN mvn -B -ntp \
     -Dmaven.wagon.http.retryHandler.count=5 \
     -pl ${MODULE} -am package -DskipTests
 
-FROM docker.m.daocloud.io/library/eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-alpine-3.22
 ARG MODULE
+RUN apk update && apk upgrade --no-cache openssl && rm -rf /var/cache/apk/*
 WORKDIR /app
 COPY --from=build /workspace/${MODULE}/target/${MODULE}-1.0.0-SNAPSHOT.jar app.jar
 ENTRYPOINT ["java","-jar","/app/app.jar"]

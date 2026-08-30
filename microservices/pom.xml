@@ -24,6 +24,7 @@
         <tomcat.version>10.1.56</tomcat.version>
         <netty.version>4.1.136.Final</netty.version>
         <bouncycastle.version>1.85</bouncycastle.version>
+        <log4j2.version>2.25.5</log4j2.version>
     </properties>
     <modules>
         <module>platform-security</module>
