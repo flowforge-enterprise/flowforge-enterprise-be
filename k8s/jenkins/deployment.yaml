@@ -3,6 +3,12 @@ kind: Deployment
 metadata:
   name: jenkins
   namespace: jenkins
+  annotations:
+    checkov.io/skip1: "CKV_K8S_22=Jenkins requires write access to JENKINS_HOME"
+    checkov.io/skip2: "CKV_K8S_23=Jenkins runs as root to manage Docker build agents"
+    checkov.io/skip3: "CKV_K8S_27=Jenkins requires Docker socket to run container build agents"
+    checkov.io/skip4: "CKV_K8S_38=Jenkins service account token required for Kubernetes API access"
+    checkov.io/skip5: "CKV_K8S_40=Jenkins runs as root (UID 0) which is required to manage build agents"
 spec:
   replicas: 1
   selector:
@@ -14,12 +20,16 @@ spec:
         app: jenkins
     spec:
       serviceAccountName: jenkins
+      automountServiceAccountToken: true
       securityContext:
         fsGroup: 1000
         runAsUser: 0
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: jenkins
           image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/jenkins:lts
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: web
@@ -46,6 +56,12 @@ spec:
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+                - NET_RAW
           resources:
             requests:
               cpu: "500m"

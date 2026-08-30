@@ -1,0 +1,81 @@
+skip-check:
+  # Secrets referenced via secretKeyRef in env vars — standard and secure Spring Boot pattern.
+  # Mounting every secret as a file would require a projected volume per secret, which adds
+  # no practical security benefit when the pod already has least-privilege RBAC.
+  - CKV_K8S_35
+  # NetworkPolicy enforcement is a cluster-level concern managed outside individual service
+  # manifests; adding per-pod NetworkPolicy stubs here would be incomplete and misleading.
+  - CKV2_K8S_6
+  # Image digest pinning is impractical in CI/CD pipelines where the image tag is updated
+  # on every build; digest verification is handled at the registry admission level instead.
+  - CKV_K8S_43
+
+  # CIS Kubernetes Benchmark — control-plane configuration checks.
+  # These verify kube-apiserver, etcd, kubelet, and scheduler CLI arguments.
+  # They are not applicable to application deployment manifests.
+  - CKV_K8S_68
+  - CKV_K8S_69
+  - CKV_K8S_70
+  - CKV_K8S_71
+  - CKV_K8S_72
+  - CKV_K8S_73
+  - CKV_K8S_74
+  - CKV_K8S_75
+  - CKV_K8S_76
+  - CKV_K8S_77
+  - CKV_K8S_78
+  - CKV_K8S_79
+  - CKV_K8S_80
+  - CKV_K8S_81
+  - CKV_K8S_82
+  - CKV_K8S_83
+  - CKV_K8S_84
+  - CKV_K8S_85
+  - CKV_K8S_86
+  - CKV_K8S_87
+  - CKV_K8S_88
+  - CKV_K8S_89
+  - CKV_K8S_90
+  - CKV_K8S_91
+  - CKV_K8S_92
+  - CKV_K8S_93
+  - CKV_K8S_94
+  - CKV_K8S_95
+  - CKV_K8S_96
+  - CKV_K8S_97
+  - CKV_K8S_98
+  - CKV_K8S_99
+  - CKV_K8S_100
+  - CKV_K8S_101
+  - CKV_K8S_102
+  - CKV_K8S_103
+  - CKV_K8S_104
+  - CKV_K8S_105
+  - CKV_K8S_106
+  - CKV_K8S_107
+  - CKV_K8S_108
+  - CKV_K8S_109
+  - CKV_K8S_110
+  - CKV_K8S_111
+  - CKV_K8S_112
+  - CKV_K8S_113
+  - CKV_K8S_114
+  - CKV_K8S_115
+  - CKV_K8S_116
+  - CKV_K8S_117
+  - CKV_K8S_118
+  - CKV_K8S_119
+  - CKV_K8S_138
+  - CKV_K8S_139
+  - CKV_K8S_140
+  - CKV_K8S_141
+  - CKV_K8S_142
+  - CKV_K8S_143
+  - CKV_K8S_144
+  - CKV_K8S_145
+  - CKV_K8S_146
+  - CKV_K8S_147
+  - CKV_K8S_148
+  - CKV_K8S_149
+  - CKV_K8S_150
+  - CKV_K8S_151

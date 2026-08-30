@@ -351,10 +351,11 @@ jobs:
           "$CHECKOV_BIN" \
             --directory k8s \
             --framework kubernetes \
+            --config-file k8s/.checkov.yaml \
+            --output cli \
             --output json \
-            --soft-fail \
-            > evidence/iac/checkov-kubernetes.json \
-            2> evidence/iac/checkov-stderr.log || true
+            --output-file-path evidence/iac \
+            --soft-fail || true
 
       - name: Upload Checkov evidence
         if: always()

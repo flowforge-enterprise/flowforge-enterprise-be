@@ -25,11 +25,18 @@ spec:
       labels:
         app: notification-audit-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: acr-secret
       containers:
         - name: notification-audit-service
-          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/notification-audit-service:latest
+          image: crpi-vu83mjrcrc7gnl5w.cn-hangzhou.personal.cr.aliyuncs.com/nus_flowforge/notification-audit-service:1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8083
@@ -68,6 +75,26 @@ spec:
               port: 8083
             initialDelaySeconds: 40
             periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+                - NET_RAW
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
 
 ---
 apiVersion: v1
