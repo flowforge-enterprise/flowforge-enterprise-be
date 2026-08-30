@@ -484,6 +484,10 @@ jobs:
         if: env.SNYK_TOKEN != ''
         run: snyk test --file=pom.xml --severity-threshold=high
 
+      - name: Upload SCA results to Snyk
+        if: env.SNYK_TOKEN != ''
+        run: snyk monitor --file=pom.xml --project-name="${{ matrix.module }}"
+
   snyk-sast:
     name: Security | Snyk Code (${{ matrix.module }})
     runs-on: ubuntu-latest
@@ -513,7 +517,7 @@ jobs:
 
       - name: Scan source code with Snyk Code
         if: env.SNYK_TOKEN != ''
-        run: snyk code test --severity-threshold=high
+        run: snyk code test --severity-threshold=high --report
 
   trivy-image-scan:
     name: Security | Trivy image scan (${{ matrix.module }})
