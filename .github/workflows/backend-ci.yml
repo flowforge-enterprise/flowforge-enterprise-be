@@ -481,6 +481,7 @@ jobs:
         run: npm install -g snyk
 
       - name: Scan dependencies with Snyk
+        if: env.SNYK_TOKEN != ''
         run: snyk test --file=pom.xml --severity-threshold=high
 
   snyk-sast:
@@ -511,6 +512,7 @@ jobs:
         run: npm install -g snyk
 
       - name: Scan source code with Snyk Code
+        if: env.SNYK_TOKEN != ''
         run: snyk code test --severity-threshold=high
 
   trivy-image-scan:
