@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.SecurityFilterChain;
@@ -72,7 +73,7 @@ public class NotificationAuditApplication {
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
-    return http.csrf(c -> c.ignoringRequestMatchers("/api/**", "/internal/**"))
+    return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(h -> SecurityJsonHandlers.configure(h, mapper))
         .authorizeHttpRequests(

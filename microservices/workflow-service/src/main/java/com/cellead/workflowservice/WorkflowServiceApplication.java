@@ -39,6 +39,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.SecurityFilterChain;
@@ -77,7 +78,7 @@ public class WorkflowServiceApplication {
   @Bean
   SecurityFilterChain security(HttpSecurity http, JwtService jwt, ObjectMapper mapper)
       throws Exception {
-    return http.csrf(c -> c.ignoringRequestMatchers("/api/**", "/internal/**"))
+    return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(h -> SecurityJsonHandlers.configure(h, mapper))
         .authorizeHttpRequests(
@@ -549,8 +550,8 @@ class WorkflowController {
           spec.and(
               (root, query, cb) ->
                   cb.or(
-                      cb.like(cb.lower(root.get("title")), pattern),
-                      cb.like(cb.lower(root.get("description")), pattern)));
+                      cb.like(cb.lower(root.get("title")), cb.literal(pattern)),
+                      cb.like(cb.lower(root.get("description")), cb.literal(pattern))));
     }
     return workflows
         .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))

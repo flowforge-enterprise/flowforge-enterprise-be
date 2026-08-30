@@ -340,7 +340,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Checkov
-        run: python3 -m pip install --user checkov
+        run: python3 -m pip install --user checkov==3.3.16
 
       # Checkov is evidence-only for now; remove --soft-fail / || true later
       # if you want IaC policy violations to block the pipeline.
