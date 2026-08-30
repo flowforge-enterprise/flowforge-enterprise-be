@@ -1,5 +1,7 @@
 package com.cellead.ai;
 
+// AI assistant service entry point
+
 import com.cellead.platform.security.AuthenticatedUser;
 import com.cellead.platform.security.CorrelationIdFilter;
 import com.cellead.platform.security.JwtAuthenticationFilter;
