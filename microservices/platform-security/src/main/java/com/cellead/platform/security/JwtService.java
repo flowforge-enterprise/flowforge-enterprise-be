@@ -1,5 +1,7 @@
 package com.cellead.platform.security;
 
+// Shared JWT utility used by all microservices
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
