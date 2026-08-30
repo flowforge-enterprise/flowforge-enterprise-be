@@ -517,7 +517,7 @@ jobs:
 
       - name: Scan source code with Snyk Code
         if: env.SNYK_TOKEN != ''
-        run: snyk code test --severity-threshold=high --report
+        run: snyk code test --severity-threshold=high --report --project-name="${{ matrix.module }}"
 
   trivy-image-scan:
     name: Security | Trivy image scan (${{ matrix.module }})
